@@ -1,4 +1,5 @@
 const userService = require('../services/userService');
+const jwt = require('jsonwebtoken');
 
 const userController = {
   async register(req, res) {
@@ -33,9 +34,15 @@ const userController = {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // In a real app, you would generate a JWT here
+      const token = jwt.sign(
+        { email: user.email, id: user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
       res.status(200).json({ 
         message: 'Login successful', 
+        token,
         user: { email: user.email, name: user.name } 
       });
     } catch (error) {
