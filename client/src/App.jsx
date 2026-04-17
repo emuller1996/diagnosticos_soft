@@ -7,7 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // We will implement these in the next steps
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
+import AuthenticatedApp from './components/layout/AuthenticatedApp';
 
 const theme = createTheme({
   palette: {
@@ -32,20 +32,18 @@ function App() {
     <AuthProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-          <Route path="*" element={<Navigate to="/dashboard" />} />
-        </Routes>
+         <Routes>
+           <Route path="/login" element={<Login />} />
+           <Route path="/register" element={<Register />} />
+           <Route 
+             path="/*" 
+             element={
+               <ProtectedRoute>
+                 <AuthenticatedApp />
+               </ProtectedRoute>
+             } 
+           />
+         </Routes>
       </ThemeProvider>
     </AuthProvider>
   );
