@@ -11,9 +11,11 @@ import {
   Tooltip, 
   Chip 
 } from '@mui/material';
-import { DeleteOutline, Visibility } from '@mui/icons-material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ModeEditIcon from '@mui/icons-material/ModeEdit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
-const ProjectList = ({ projects, onInactivate }) => {
+const ProjectList = ({ projects, onInactivate, onEdit }) => {
   return (
     <TableContainer component={Paper} sx={{ mt: 3 }}>
       <Table>
@@ -47,18 +49,28 @@ const ProjectList = ({ projects, onInactivate }) => {
                 <TableCell align="right">
                   <Tooltip title="Ver Detalles">
                     <IconButton color="primary">
-                      <Visibility />
+                      <VisibilityIcon />
                     </IconButton>
                   </Tooltip>
                   {project.active && (
-                    <Tooltip title="Inactivar Proyecto">
-                      <IconButton 
-                        color="error" 
-                        onClick={() => onInactivate(project.id)}
-                      >
-                        <DeleteOutline />
-                      </IconButton>
-                    </Tooltip>
+                    <>
+                      <Tooltip title="Editar Proyecto">
+                        <IconButton 
+                          color="primary" 
+                          onClick={() => onEdit(project)}
+                        >
+                          <ModeEditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Inactivar Proyecto">
+                        <IconButton 
+                          color="error" 
+                          onClick={() => onInactivate(project.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </>
                   )}
                 </TableCell>
               </TableRow>

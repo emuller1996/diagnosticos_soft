@@ -45,14 +45,14 @@ const projectController = {
   async updateProject(req, res) {
     try {
       const { projectId } = req.params;
-      const { name, description, status, startDate, endDate } = req.body;
+      const { name, description, project_type, community, city } = req.body;
 
       const updateData = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
-      if (status !== undefined) updateData.status = status;
-      if (startDate !== undefined) updateData.startDate = startDate;
-      if (endDate !== undefined) updateData.endDate = endDate;
+      if (project_type !== undefined) updateData.project_type = project_type;
+      if (community !== undefined) updateData.community = community;
+      if (city !== undefined) updateData.city = city;
 
       const project = await projectService.updateProject(projectId, updateData);
       res.status(200).json({ message: 'Project updated successfully', project });
