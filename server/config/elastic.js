@@ -1,5 +1,7 @@
-const { Client } = require('@elastic/elasticsearch');
-require('dotenv').config({ path: '.env' });
+import { Client } from '@elastic/elasticsearch';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env' });
 
 const client = new Client({
   node: process.env.ELASTIC_NODE,
@@ -9,4 +11,4 @@ const client = new Client({
   },
 });
 
-module.exports = client;
+export default client;

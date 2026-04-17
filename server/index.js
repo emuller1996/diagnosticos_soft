@@ -1,13 +1,18 @@
-require('dotenv').config({ path: '.env' });
-const express = require('express');
-const cors = require('cors');
-const userRoutes = require('./routes/userRoutes');
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import userRoutes from './routes/userRoutes.js';
+import morgan from "morgan";
+
+dotenv.config({ path: '.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Enable CORS
 app.use(cors());
+
+app.use(morgan("dev"));
 
 // Middleware to parse JSON
 app.use(express.json());

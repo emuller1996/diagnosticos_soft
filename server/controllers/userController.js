@@ -1,5 +1,5 @@
-const userService = require('../services/userService');
-const jwt = require('jsonwebtoken');
+import userService from '../services/userService.js';
+import jwt from 'jsonwebtoken';
 
 const userController = {
   async register(req, res) {
@@ -51,4 +51,4 @@ const userController = {
   }
 };
 
-module.exports = userController;
+export default userController;

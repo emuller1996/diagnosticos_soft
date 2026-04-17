@@ -1,6 +1,6 @@
-const client = require('../config/elastic');
+import client from '../config/elastic.js';
 
-const INDEX_NAME = 'users';
+const INDEX_NAME = process.env.INDEX_ELASTIC;
 
 const userService = {
   async createUser(userData) {
@@ -42,4 +42,4 @@ const userService = {
   }
 };
 
-module.exports = userService;
+export default userService;
