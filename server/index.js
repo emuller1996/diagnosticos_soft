@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import userRoutes from './routes/userRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
+import diagnosticoRoutes from './routes/diagnosticoRoutes.js';
 import morgan from "morgan";
 
 dotenv.config({ path: '.env' });
@@ -21,6 +22,7 @@ app.use(express.json());
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/diagnosticos', diagnosticoRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {

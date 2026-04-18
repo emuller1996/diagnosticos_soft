@@ -22,6 +22,7 @@ import {
   Menu as MenuIcon, 
   Logout as LogoutIcon
 } from '@mui/icons-material';
+import DataExplorationIcon from '@mui/icons-material/DataExploration';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 
 const drawerWidth = 260;
@@ -36,6 +37,11 @@ const MENU_ITEMS = [
     text: 'Proyectos', 
     icon: <ProjectIcon />, 
     path: '/dashboard/proyectos' 
+  },
+  { 
+    text: 'Diagnosticos', 
+    icon: <DataExplorationIcon />, 
+    path: '/dashboard/diagnosticos' 
   },
 ];
 
