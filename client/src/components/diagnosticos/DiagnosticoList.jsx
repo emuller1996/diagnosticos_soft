@@ -15,34 +15,38 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ModeEditIcon from '@mui/icons-material/ModeEdit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
-const ProjectList = ({ projects, onInactivate, onEdit }) => {
+const DiagnosticoList = ({ diagnosticos, onInactivate, onEdit, loading }) => {
+  if (loading) {
+    return <div style={{ textAlign: 'center', mt: 3 }}>Cargando diagnósticos...</div>;
+  }
+
   return (
     <TableContainer component={Paper} sx={{ mt: 3 }}>
       <Table>
         <TableHead sx={{ backgroundColor: 'grey.200' }}>
           <TableRow>
-            <TableCell><strong>Nombre</strong></TableCell>
-            <TableCell><strong>Tipo</strong></TableCell>
-            <TableCell><strong>Ciudad</strong></TableCell>
+            <TableCell><strong>Titular</strong></TableCell>
+            <TableCell><strong>Documento</strong></TableCell>
+            <TableCell><strong>Modalidad</strong></TableCell>
             <TableCell><strong>Estado</strong></TableCell>
             <TableCell align="right"><strong>Acciones</strong></TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {projects.length === 0 ? (
+          {diagnosticos.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} align="center">No hay proyectos registrados</TableCell>
+              <TableCell colSpan={5} align="center">No hay diagnósticos registrados</TableCell>
             </TableRow>
           ) : (
-            projects.map((project) => (
-              <TableRow key={project.id} hover>
-                <TableCell>{project.name}</TableCell>
-                <TableCell>{project.project_type}</TableCell>
-                <TableCell>{project.city}</TableCell>
+            diagnosticos.map((diag) => (
+              <TableRow key={diag.id} hover>
+                <TableCell>{`${diag.titular.nombre} ${diag.titular.apellido}`}</TableCell>
+                <TableCell>{diag.titular.documento}</TableCell>
+                <TableCell>{diag.modalidad.type}</TableCell>
                 <TableCell>
                   <Chip 
-                    label={project.active ? 'Activo' : 'Inactivo'} 
-                    color={project.active ? 'success' : 'default'} 
+                    label={diag.active ? 'Activo' : 'Inactivo'} 
+                    color={diag.active ? 'success' : 'default'} 
                     size="small" 
                   />
                 </TableCell>
@@ -52,20 +56,20 @@ const ProjectList = ({ projects, onInactivate, onEdit }) => {
                       <VisibilityIcon />
                     </IconButton>
                   </Tooltip>
-                  {project.active && (
+                  {diag.active && (
                     <>
-                      <Tooltip title="Editar Proyecto">
+                      <Tooltip title="Editar Diagnóstico">
                         <IconButton 
                           color="primary" 
-                          onClick={() => onEdit(project)}
+                          onClick={() => onEdit(diag)}
                         >
                           <ModeEditIcon />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Inactivar Proyecto">
+                      <Tooltip title="Inactivar Diagnóstico">
                         <IconButton 
                           color="error" 
-                          onClick={() => onInactivate(project.id)}
+                          onClick={() => onInactivate(diag.id)}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -82,4 +86,4 @@ const ProjectList = ({ projects, onInactivate, onEdit }) => {
   );
 };
 
-export default ProjectList;
+export default DiagnosticoList;

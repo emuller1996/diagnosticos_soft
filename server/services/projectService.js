@@ -1,12 +1,12 @@
-import elasticClient from '../config/elastic.js';
+import elasticClient from "../config/elastic.js";
 
-const INDEX_NAME = process.env.ELASTICSEARCH_INDEX || 'projects_index';
+const INDEX_NAME = process.env.INDEX_ELASTIC;
 
 const projectService = {
   async createProject(projectData) {
     const project = {
       ...projectData,
-      type: 'projects',
+      type: "projects",
       active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -16,7 +16,7 @@ const projectService = {
       index: INDEX_NAME,
       body: project,
     });
-
+    await elasticClient.indices.refresh({ index: INDEX_NAME });
     return { id: response._id, ...project };
   },
 
@@ -32,7 +32,7 @@ const projectService = {
       }
 
       const project = response._source;
-      if (project.type !== 'projects' || !project.active) {
+      if (project.type !== "projects" || !project.active) {
         return null;
       }
 
@@ -48,12 +48,12 @@ const projectService = {
   async updateProject(projectId, updateData) {
     const project = await this.getProjectById(projectId);
     if (!project) {
-      throw new Error('Project not found');
+      throw new Error("Project not found");
     }
 
     const updatedProject = {
       ...updateData,
-      type: 'projects',
+      type: "projects",
       updatedAt: new Date().toISOString(),
     };
 
@@ -64,14 +64,14 @@ const projectService = {
         doc: updatedProject,
       },
     });
-
+    await elasticClient.indices.refresh({ index: INDEX_NAME });
     return { id: projectId, ...project, ...updatedProject };
   },
 
   async inactivateProject(projectId) {
     const project = await this.getProjectById(projectId);
     if (!project) {
-      throw new Error('Project not found');
+      throw new Error("Project not found");
     }
 
     await elasticClient.update({
@@ -88,11 +88,11 @@ const projectService = {
     return { id: projectId, ...project, active: false };
   },
 
-  async listProjects({ page = 1, limit = 10, search = '' }) {
+  async listProjects({ page = 1, limit = 10, search = "" }) {
     const from = (page - 1) * limit;
 
     const mustClauses = [
-      { term: { type: 'projects' } },
+      { term: { type: "projects" } },
       { term: { active: true } },
     ];
 
@@ -100,8 +100,8 @@ const projectService = {
       mustClauses.push({
         multi_match: {
           query: search,
-          fields: ['name', 'description'],
-          fuzziness: 'AUTO',
+          fields: ["name", "description"],
+          fuzziness: "AUTO",
         },
       });
     }
@@ -116,7 +116,7 @@ const projectService = {
             must: mustClauses,
           },
         },
-        sort: [{ createdAt: { order: 'desc' } }],
+        sort: [{ createdAt: { order: "desc" } }],
       },
     });
 
@@ -144,12 +144,12 @@ const projectService = {
       body: {
         size: 0,
         query: {
-          term: { type: 'projects' },
+          term: { type: "projects" },
         },
         aggs: {
           by_status: {
             terms: {
-              field: 'active',
+              field: "active",
               size: 2,
             },
           },
