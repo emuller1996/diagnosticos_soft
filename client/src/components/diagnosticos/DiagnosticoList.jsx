@@ -14,6 +14,8 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import ModeEditIcon from '@mui/icons-material/ModeEdit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import { downloadDiagnosticoPdf } from '../../services/pdf/diagnosticoPdf';
 
 const DiagnosticoList = ({ diagnosticos, onInactivate, onEdit, loading }) => {
   if (loading) {
@@ -38,47 +40,55 @@ const DiagnosticoList = ({ diagnosticos, onInactivate, onEdit, loading }) => {
               <TableCell colSpan={5} align="center">No hay diagnósticos registrados</TableCell>
             </TableRow>
           ) : (
-            diagnosticos.map((diag) => (
-              <TableRow key={diag.id} hover>
-                <TableCell>{`${diag.titular.nombre} ${diag.titular.apellido}`}</TableCell>
-                <TableCell>{diag.titular.documento}</TableCell>
-                <TableCell>{diag.modalidad.type}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={diag.active ? 'Activo' : 'Inactivo'} 
-                    color={diag.active ? 'success' : 'default'} 
-                    size="small" 
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <Tooltip title="Ver Detalles">
-                    <IconButton color="primary">
-                      <VisibilityIcon />
-                    </IconButton>
-                  </Tooltip>
-                  {diag.active && (
-                    <>
-                      <Tooltip title="Editar Diagnóstico">
-                        <IconButton 
-                          color="primary" 
-                          onClick={() => onEdit(diag)}
-                        >
-                          <ModeEditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Inactivar Diagnóstico">
-                        <IconButton 
-                          color="error" 
-                          onClick={() => onInactivate(diag.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))
+            diagnosticos.map((diag) => {
+              const isActive = diag.estado !== 'inactivo';
+              return (
+                <TableRow key={diag.id} hover>
+                  <TableCell>{`${diag.titular?.nombre ?? ''} ${diag.titular?.apellido ?? ''}`}</TableCell>
+                  <TableCell>{diag.titular?.documento}</TableCell>
+                  <TableCell>{diag.modalidad?.type}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={isActive ? 'Activo' : 'Inactivo'}
+                      color={isActive ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Ver Detalles">
+                      <IconButton color="primary">
+                        <VisibilityIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Descargar PDF">
+                      <IconButton color="primary" onClick={() => downloadDiagnosticoPdf(diag)}>
+                        <PictureAsPdfIcon />
+                      </IconButton>
+                    </Tooltip>
+                    {isActive && (
+                      <>
+                        <Tooltip title="Editar Diagnóstico">
+                          <IconButton
+                            color="primary"
+                            onClick={() => onEdit(diag)}
+                          >
+                            <ModeEditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Inactivar Diagnóstico">
+                          <IconButton
+                            color="error"
+                            onClick={() => onInactivate(diag.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
