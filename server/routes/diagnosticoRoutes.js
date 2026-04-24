@@ -1,7 +1,10 @@
 import express from 'express';
 import * as diagnosticoController from '../controllers/diagnosticoController.js';
+import authMiddleware from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
+
+router.use(authMiddleware);
 
 router.get('/', diagnosticoController.getAllDiagnosticos);
 router.get('/:id', diagnosticoController.getDiagnosticoById);
