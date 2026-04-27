@@ -1,4 +1,5 @@
 import diagnosticoService from '../services/diagnosticoService.js';
+import { saveCroquisAsWebP, deleteCroquisFile } from '../services/croquisService.js';
 
 export const getAllDiagnosticos = async (req, res) => {
   try {
@@ -51,5 +52,37 @@ export const inactivateDiagnostico = async (req, res) => {
     res.json(diagnostico);
   } catch (error) {
     res.status(404).json({ message: error.message });
+  }
+};
+
+export const uploadCroquis = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No se envió ningún archivo de imagen.' });
+    }
+
+    const diag = await diagnosticoService.getById(req.params.id);
+    const documento = diag.titular?.documento;
+
+    const previousUrl = diag.levantamiento?.croquisUrl;
+    const { url, sizeBytes } = await saveCroquisAsWebP(req.file.buffer, {
+      documento,
+      id: req.params.id,
+    });
+
+    if (previousUrl && previousUrl !== url) {
+      await deleteCroquisFile(previousUrl);
+    }
+
+    const updated = await diagnosticoService.update(req.params.id, {
+      levantamiento: { ...(diag.levantamiento || {}), croquisUrl: url, croquisSizeBytes: sizeBytes },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    if (error.message === 'Diagnóstico no encontrado') {
+      return res.status(404).json({ message: error.message });
+    }
+    res.status(500).json({ message: error.message });
   }
 };
