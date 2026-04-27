@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import userRoutes from './routes/userRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
 import diagnosticoRoutes from './routes/diagnosticoRoutes.js';
@@ -18,6 +19,9 @@ app.use(morgan("dev"));
 
 // Middleware to parse JSON
 app.use(express.json());
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.resolve('uploads')));
 
 // Routes
 app.use('/api/users', userRoutes);
