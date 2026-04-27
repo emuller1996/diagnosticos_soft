@@ -30,7 +30,8 @@ const Login = () => {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message || 'Error al iniciar sesión');
+      
+      setError(err.response.data.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ const Login = () => {
             </Typography>
           </Box>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
 
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField

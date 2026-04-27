@@ -16,4 +16,8 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+const STATIC_BASE = baseURL.replace(/\/api\/?$/, '');
+export const resolveStaticUrl = (relativePath) =>
+  relativePath ? `${STATIC_BASE}${relativePath.startsWith('/') ? '' : '/'}${relativePath}` : '';
+
 export default apiClient;

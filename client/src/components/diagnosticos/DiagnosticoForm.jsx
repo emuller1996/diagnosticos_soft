@@ -13,7 +13,19 @@ import {
   Grid,
   Divider,
   Paper,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
+import { uploadService } from '../../services/uploadService';
+import { resolveStaticUrl } from '../../services/apiClient';
 
 const MODALIDADES = [
   { value: 'vivienda nueva', label: 'Vivienda Nueva' },
@@ -52,6 +64,66 @@ const CAUSAS_NO_CUMPLE = [
   'Otro',
 ];
 
+const FUENTES_AGUA = [
+  'Acueducto convencional',
+  'Acueducto no convencional',
+  'Aljibe',
+  'Cuerpo superficial de agua',
+  'Agua lluvia',
+  'Vehículo cisterna',
+  'Método alternativo',
+  'Otro',
+];
+
+const TIPOS_AGUAS_RESIDUALES = [
+  'Red de alcantarillado convencional',
+  'Sistema séptico',
+  'Pozo de absorción',
+  'Otro',
+  'Ninguno',
+];
+
+const TIPOS_ENERGIA = [
+  'Conexión a red de energía eléctrica',
+  'Fuente propia de energía',
+  'Otro',
+  'Ninguno',
+];
+
+const PREMISAS_DIBUJO = [
+  'Linderos del predio',
+  'Acceso principal del predio',
+  'Zona de implantación',
+  'Puntos cardinales (Norte)',
+  'Vivienda existente (Mejoramiento)',
+  'Acceso a la vivienda (Mejoramiento)',
+  'Cotas generales predio',
+  'Cotas generales vivienda',
+  'Cotas zona de implantación',
+];
+
+const MIEMBRO_VACIO = {
+  apellidos: '',
+  nombres: '',
+  documento: '',
+  alteracionMovilidad: false,
+  ciegoSordo: false,
+  altNeurologica: false,
+  condEscaleras: false,
+  descDiscapacidad: '',
+};
+
+const MIEMBRO_DEFAULT = {
+  apellidos: '',
+  nombres: '',
+  documento: '',
+  alteracionMovilidad: false,
+  ciegoSordo: false,
+  altNeurologica: false,
+  condEscaleras: false,
+  descDiscapacidad: '',
+};
+
 const buildInitialState = (initialData) => {
   const defaults = {
     metadata: {
@@ -82,9 +154,23 @@ const buildInitialState = (initialData) => {
       cumple: true,
     })),
     causasNoCumple: { causas: [], otro: '' },
+    serviciosPublicos: {
+      abastecimientoAgua: { cuenta: null, fuentes: [], fuenteOtroDescripcion: '' },
+      aguasResiduales: { tipo: '', otroDescripcion: '' },
+      energia: { tipo: '', otroDescripcion: '' },
+    },
+    levantamiento: {
+      premisas: [],
+      caracteristicas: { area: '', pendiente: '', observaciones: '' },
+      croquisUrl: '',
+    },
+    miembros: [],
   };
 
   if (!initialData) return defaults;
+
+  const incomingServicios = initialData.serviciosPublicos || {};
+  const incomingLevantamiento = initialData.levantamiento || {};
 
   return {
     ...defaults,
@@ -99,11 +185,40 @@ const buildInitialState = (initialData) => {
         ? initialData.condicionesAmbientales
         : defaults.condicionesAmbientales,
     causasNoCumple: { ...defaults.causasNoCumple, ...(initialData.causasNoCumple || {}) },
+    serviciosPublicos: {
+      abastecimientoAgua: {
+        ...defaults.serviciosPublicos.abastecimientoAgua,
+        ...(incomingServicios.abastecimientoAgua || {}),
+      },
+      aguasResiduales: {
+        ...defaults.serviciosPublicos.aguasResiduales,
+        ...(incomingServicios.aguasResiduales || {}),
+      },
+      energia: {
+        ...defaults.serviciosPublicos.energia,
+        ...(incomingServicios.energia || {}), 
+      },
+    },
+    levantamiento: {
+      premisas: Array.isArray(incomingLevantamiento.premisas) ? incomingLevantamiento.premisas : [],
+      caracteristicas: {
+        ...defaults.levantamiento.caracteristicas,
+        ...(incomingLevantamiento.caracteristicas || {}),
+      },
+      croquisUrl: incomingLevantamiento.croquisUrl || '',
+    },
+    miembros: Array.isArray(initialData.miembros)
+      ? initialData.miembros.map((m) => ({ ...MIEMBRO_VACIO, ...m }))
+      : [],
   };
 };
 
 const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState(() => buildInitialState(initialData));
+  const [croquisUploading, setCroquisUploading] = useState(false);
+  const [croquisError, setCroquisError] = useState(null);
+
+  const diagnosticoId = initialData?.id;
 
   const handleSectionChange = (section, field, value) => {
     setFormData((prev) => ({
@@ -132,6 +247,91 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
         : [...current, causa];
       return { ...prev, causasNoCumple: { ...prev.causasNoCumple, causas } };
     });
+  };
+
+  const handleServicioChange = (subsection, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      serviciosPublicos: {
+        ...prev.serviciosPublicos,
+        [subsection]: { ...prev.serviciosPublicos[subsection], [field]: value },
+      },
+    }));
+  };
+
+  const toggleFuenteAgua = (fuente) => {
+    setFormData((prev) => {
+      const current = prev.serviciosPublicos.abastecimientoAgua.fuentes;
+      const fuentes = current.includes(fuente)
+        ? current.filter((f) => f !== fuente)
+        : [...current, fuente];
+      return {
+        ...prev,
+        serviciosPublicos: {
+          ...prev.serviciosPublicos,
+          abastecimientoAgua: { ...prev.serviciosPublicos.abastecimientoAgua, fuentes },
+        },
+      };
+    });
+  };
+
+  const togglePremisa = (premisa) => {
+    setFormData((prev) => {
+      const current = prev.levantamiento.premisas;
+      const premisas = current.includes(premisa)
+        ? current.filter((p) => p !== premisa)
+        : [...current, premisa];
+      return {
+        ...prev,
+        levantamiento: { ...prev.levantamiento, premisas },
+      };
+    });
+  };
+
+  const handleCaracteristicaChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      levantamiento: {
+        ...prev.levantamiento,
+        caracteristicas: { ...prev.levantamiento.caracteristicas, [field]: value },
+      },
+    }));
+  };
+
+  const addMiembro = () => {
+    setFormData((prev) => ({ ...prev, miembros: [...prev.miembros, { ...MIEMBRO_VACIO }] }));
+  };
+
+  const removeMiembro = (index) => {
+    setFormData((prev) => ({ ...prev, miembros: prev.miembros.filter((_, i) => i !== index) }));
+  };
+
+  const handleMiembroChange = (index, field, value) => {
+    setFormData((prev) => {
+      const next = [...prev.miembros];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, miembros: next };
+    });
+  };
+
+  const handleCroquisUpload = async (file) => {
+    if (!file || !diagnosticoId) return;
+    setCroquisError(null);
+    setCroquisUploading(true);
+    try {
+      const updated = await uploadService.uploadCroquis(diagnosticoId, file);
+      setFormData((prev) => ({
+        ...prev,
+        levantamiento: {
+          ...prev.levantamiento,
+          croquisUrl: updated?.levantamiento?.croquisUrl || '',
+        },
+      }));
+    } catch (err) {
+      setCroquisError(err?.response?.data?.message || err.message || 'Error subiendo el croquis.');
+    } finally {
+      setCroquisUploading(false);
+    }
   };
 
   const hasIncumplimiento = formData.condicionesAmbientales.some((c) => c.cumple === false);
@@ -437,6 +637,355 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               )}
             </Box>
           )}
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">F. Disponibilidad o Acceso a Servicios Públicos</Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Abastecimiento de Agua
+            </Typography>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2">
+                ¿El predio cuenta con posibilidad de abastecimiento de agua?
+              </Typography>
+              <RadioGroup
+                row
+                value={
+                  formData.serviciosPublicos.abastecimientoAgua.cuenta === true
+                    ? 'si'
+                    : formData.serviciosPublicos.abastecimientoAgua.cuenta === false
+                    ? 'no'
+                    : ''
+                }
+                onChange={(e) => handleServicioChange('abastecimientoAgua', 'cuenta', e.target.value === 'si')}
+              >
+                <FormControlLabel value="si" control={<Radio size="small" />} label="SI" />
+                <FormControlLabel value="no" control={<Radio size="small" />} label="NO" />
+              </RadioGroup>
+            </Box>
+
+            <Typography variant="body2" fontWeight="bold" sx={{ mt: 1, mb: 0.5 }}>
+              Fuente de agua para consumo humano y doméstico:
+            </Typography>
+            <FormGroup row>
+              {FUENTES_AGUA.map((fuente) => (
+                <FormControlLabel
+                  key={fuente}
+                  sx={{ minWidth: '25%' }}
+                  control={
+                    <Checkbox
+                      checked={formData.serviciosPublicos.abastecimientoAgua.fuentes.includes(fuente)}
+                      onChange={() => toggleFuenteAgua(fuente)}
+                    />
+                  }
+                  label={fuente}
+                />
+              ))}
+            </FormGroup>
+            {formData.serviciosPublicos.abastecimientoAgua.fuentes.includes('Otro') && (
+              <TextField
+                fullWidth label="¿Cuál? (Otro)"
+                sx={{ mt: 1 }}
+                value={formData.serviciosPublicos.abastecimientoAgua.fuenteOtroDescripcion}
+                onChange={(e) => handleServicioChange('abastecimientoAgua', 'fuenteOtroDescripcion', e.target.value)}
+                required
+              />
+            )}
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Tratamiento de Aguas Residuales
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              ¿Con qué tipo de servicio sanitario cuenta el hogar?
+            </Typography>
+            <RadioGroup
+              row
+              value={formData.serviciosPublicos.aguasResiduales.tipo}
+              onChange={(e) => handleServicioChange('aguasResiduales', 'tipo', e.target.value)}
+            >
+              {TIPOS_AGUAS_RESIDUALES.map((tipo) => (
+                <FormControlLabel
+                  key={tipo}
+                  value={tipo}
+                  control={<Radio size="small" />}
+                  label={tipo}
+                  sx={{ minWidth: '33%' }}
+                />
+              ))}
+            </RadioGroup>
+            {formData.serviciosPublicos.aguasResiduales.tipo === 'Otro' && (
+              <TextField
+                fullWidth label="¿Cuál? (Otro)"
+                sx={{ mt: 1 }}
+                value={formData.serviciosPublicos.aguasResiduales.otroDescripcion}
+                onChange={(e) => handleServicioChange('aguasResiduales', 'otroDescripcion', e.target.value)}
+                required
+              />
+            )}
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Disponibilidad o Acceso a Energía
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              Para las actividades del hogar la energía que utiliza es:
+            </Typography>
+            <RadioGroup
+              row
+              value={formData.serviciosPublicos.energia.tipo}
+              onChange={(e) => handleServicioChange('energia', 'tipo', e.target.value)}
+            >
+              {TIPOS_ENERGIA.map((tipo) => (
+                <FormControlLabel
+                  key={tipo}
+                  value={tipo}
+                  control={<Radio size="small" />}
+                  label={tipo}
+                  sx={{ minWidth: '33%' }}
+                />
+              ))}
+            </RadioGroup>
+            {formData.serviciosPublicos.energia.tipo === 'Otro' && (
+              <TextField
+                fullWidth label="¿Cuál? (Otro)"
+                sx={{ mt: 1 }}
+                value={formData.serviciosPublicos.energia.otroDescripcion}
+                onChange={(e) => handleServicioChange('energia', 'otroDescripcion', e.target.value)}
+                required
+              />
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">G. Levantamiento (Mano Alzada)</Typography>
+          <Divider sx={{ mb: 2 }} />
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Premisas de Dibujo
+                </Typography>
+                <FormGroup>
+                  {PREMISAS_DIBUJO.map((premisa, i) => (
+                    <FormControlLabel
+                      key={premisa}
+                      control={
+                        <Checkbox
+                          checked={formData.levantamiento.premisas.includes(premisa)}
+                          onChange={() => togglePremisa(premisa)}
+                        />
+                      }
+                      label={`${String.fromCharCode(97 + i)}) ${premisa}`}
+                    />
+                  ))}
+                </FormGroup>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>
+                  Características del Predio
+                </Typography>
+                <TextField
+                  fullWidth label="A) Área zona de intervención (m²)"
+                  type="number"
+                  inputProps={{ min: 0, step: '0.01' }}
+                  sx={{ mb: 2 }}
+                  value={formData.levantamiento.caracteristicas.area}
+                  onChange={(e) => handleCaracteristicaChange('area', e.target.value)}
+                />
+                <TextField
+                  fullWidth label="B) Pendiente en zona de intervención (%)"
+                  type="number"
+                  inputProps={{ min: 0, max: 100, step: '0.01' }}
+                  sx={{ mb: 2 }}
+                  value={formData.levantamiento.caracteristicas.pendiente}
+                  onChange={(e) => handleCaracteristicaChange('pendiente', e.target.value)}
+                />
+                <TextField
+                  fullWidth label="Observaciones del levantamiento"
+                  multiline minRows={4}
+                  value={formData.levantamiento.caracteristicas.observaciones}
+                  onChange={(e) => handleCaracteristicaChange('observaciones', e.target.value)}
+                />
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Croquis / Levantamiento
+                </Typography>
+
+                {!diagnosticoId && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Guarda primero el diagnóstico para poder subir el croquis.
+                  </Alert>
+                )}
+
+                {croquisError && (
+                  <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCroquisError(null)}>
+                    {croquisError}
+                  </Alert>
+                )}
+
+                {formData.levantamiento.croquisUrl ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <Box
+                      component="img"
+                      src={resolveStaticUrl(formData.levantamiento.croquisUrl)}
+                      alt="Croquis del levantamiento"
+                      sx={{
+                        maxWidth: '100%',
+                        maxHeight: 400,
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    />
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={croquisUploading ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+                      disabled={!diagnosticoId || croquisUploading}
+                    >
+                      {croquisUploading ? 'Subiendo...' : 'Reemplazar croquis'}
+                      <input
+                        type="file" hidden accept="image/*"
+                        onChange={(e) => handleCroquisUpload(e.target.files?.[0])}
+                      />
+                    </Button>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, py: 3 }}>
+                    <Button
+                      variant="contained"
+                      component="label"
+                      startIcon={croquisUploading ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
+                      disabled={!diagnosticoId || croquisUploading}
+                    >
+                      {croquisUploading ? 'Subiendo...' : 'Subir croquis'}
+                      <input
+                        type="file" hidden accept="image/*"
+                        onChange={(e) => handleCroquisUpload(e.target.files?.[0])}
+                      />
+                    </Button>
+                    <Typography variant="caption" color="text.secondary">
+                      La imagen se convertirá a WebP en el servidor para optimizar el tamaño.
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="subtitle1" fontWeight="bold">
+              Composición del Hogar – Miembros
+            </Typography>
+            <Button size="small" startIcon={<AddIcon />} onClick={addMiembro}>
+              Agregar miembro
+            </Button>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Apellidos</strong></TableCell>
+                  <TableCell><strong>Nombres</strong></TableCell>
+                  <TableCell><strong>Documento</strong></TableCell>
+                  <TableCell align="center"><strong>Alt. Movilidad</strong></TableCell>
+                  <TableCell align="center"><strong>Ciego / Sordo</strong></TableCell>
+                  <TableCell align="center"><strong>Alt. Neurológica</strong></TableCell>
+                  <TableCell align="center"><strong>Cond. Escaleras</strong></TableCell>
+                  <TableCell><strong>Desc. Discapacidad</strong></TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {formData.miembros.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center" sx={{ color: 'text.secondary' }}>
+                      Sin miembros registrados. Usa "Agregar miembro" para añadir uno.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  formData.miembros.map((m, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        <TextField
+                          variant="standard" fullWidth
+                          value={m.apellidos}
+                          onChange={(e) => handleMiembroChange(idx, 'apellidos', e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          variant="standard" fullWidth
+                          value={m.nombres}
+                          onChange={(e) => handleMiembroChange(idx, 'nombres', e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          variant="standard" fullWidth
+                          value={m.documento}
+                          onChange={(e) => handleMiembroChange(idx, 'documento', e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Checkbox
+                          checked={m.alteracionMovilidad}
+                          onChange={(e) => handleMiembroChange(idx, 'alteracionMovilidad', e.target.checked)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Checkbox
+                          checked={m.ciegoSordo}
+                          onChange={(e) => handleMiembroChange(idx, 'ciegoSordo', e.target.checked)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Checkbox
+                          checked={m.altNeurologica}
+                          onChange={(e) => handleMiembroChange(idx, 'altNeurologica', e.target.checked)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Checkbox
+                          checked={m.condEscaleras}
+                          onChange={(e) => handleMiembroChange(idx, 'condEscaleras', e.target.checked)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          variant="standard" fullWidth
+                          value={m.descDiscapacidad}
+                          onChange={(e) => handleMiembroChange(idx, 'descDiscapacidad', e.target.value)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton size="small" color="error" onClick={() => removeMiembro(idx)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Grid>
 
         <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
