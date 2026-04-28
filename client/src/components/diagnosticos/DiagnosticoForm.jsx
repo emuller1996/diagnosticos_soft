@@ -23,9 +23,11 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon, Edit as EditIcon, Fingerprint as FingerprintIcon } from '@mui/icons-material';
 import { uploadService } from '../../services/uploadService';
 import { resolveStaticUrl } from '../../services/apiClient';
+import { compressImageToWebP } from '../../utils/imageCompression';
+import SignatureDialog from './SignatureDialog';
 
 const MODALIDADES = [
   { value: 'vivienda nueva', label: 'Vivienda Nueva' },
@@ -179,6 +181,13 @@ const buildInitialState = (initialData) => {
       croquisUrl: '',
     },
     miembros: [],
+    constanciaVisita: {
+      fechaVisita: '',
+      firmaTitular: '',
+      huellaDigital: '',
+      profesional: { nombre: '', documento: '', tarjetaProfesional: '', firma: '' },
+      testigo: '',
+    },
     conceptoTecnico: {
       requisitosGenerales: REQUISITOS_GENERALES.map((requisito) => ({
         requisito,
@@ -200,6 +209,7 @@ const buildInitialState = (initialData) => {
   const incomingLevantamiento = initialData.levantamiento || {};
   const incomingConcepto = initialData.conceptoTecnico || {};
   const incomingViviendaNueva = incomingConcepto.viviendaNueva || {};
+  const incomingConstancia = initialData.constanciaVisita || {};
 
   return {
     ...defaults,
@@ -239,6 +249,14 @@ const buildInitialState = (initialData) => {
     miembros: Array.isArray(initialData.miembros)
       ? initialData.miembros.map((m) => ({ ...MIEMBRO_VACIO, ...m }))
       : [],
+    constanciaVisita: {
+      ...defaults.constanciaVisita,
+      ...incomingConstancia,
+      profesional: {
+        ...defaults.constanciaVisita.profesional,
+        ...(incomingConstancia.profesional || {}),
+      },
+    },
     conceptoTecnico: {
       requisitosGenerales:
         Array.isArray(incomingConcepto.requisitosGenerales) &&
@@ -264,6 +282,8 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState(() => buildInitialState(initialData));
   const [croquisUploading, setCroquisUploading] = useState(false);
   const [croquisError, setCroquisError] = useState(null);
+  const [signatureDialog, setSignatureDialog] = useState({ open: false, target: null });
+  const [huellaError, setHuellaError] = useState(null);
 
   const diagnosticoId = initialData?.id;
 
@@ -416,6 +436,48 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
         },
       };
     });
+  };
+
+  const handleConstanciaChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      constanciaVisita: { ...prev.constanciaVisita, [field]: value },
+    }));
+  };
+
+  const handleProfesionalChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      constanciaVisita: {
+        ...prev.constanciaVisita,
+        profesional: { ...prev.constanciaVisita.profesional, [field]: value },
+      },
+    }));
+  };
+
+  const openSignatureDialog = (target) => setSignatureDialog({ open: true, target });
+  const closeSignatureDialog = () => setSignatureDialog({ open: false, target: null });
+
+  const handleSignatureSave = (dataUrl) => {
+    if (signatureDialog.target === 'titular') {
+      handleConstanciaChange('firmaTitular', dataUrl);
+    } else if (signatureDialog.target === 'profesional') {
+      handleProfesionalChange('firma', dataUrl);
+    }
+    closeSignatureDialog();
+  };
+
+  const handleHuellaChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setHuellaError(null);
+    try {
+      const { dataUrl } = await compressImageToWebP(file, { maxWidth: 800, maxHeight: 800, quality: 0.75 });
+      handleConstanciaChange('huellaDigital', dataUrl);
+    } catch (err) {
+      setHuellaError(err.message || 'No se pudo procesar la huella.');
+    }
   };
 
   const handleSubmit = (e) => {
@@ -1068,6 +1130,216 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               </TableBody>
             </Table>
           </TableContainer>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">I. Constancia de Visita</Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Titular del Hogar
+                </Typography>
+                <TextField
+                  fullWidth label="Nombre" size="small" sx={{ mb: 1 }}
+                  value={`${formData.titular.nombre || ''} ${formData.titular.apellido || ''}`.trim()}
+                  InputProps={{ readOnly: true }}
+                  helperText="Tomado de la sección A"
+                />
+                <TextField
+                  fullWidth label="No. Documento" size="small" sx={{ mb: 2 }}
+                  value={formData.titular.documento || ''}
+                  InputProps={{ readOnly: true }}
+                />
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">Firma del Titular</Typography>
+                  <Box
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      height: 110,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'background.paper',
+                      mt: 0.5,
+                    }}
+                  >
+                    {formData.constanciaVisita.firmaTitular ? (
+                      <img
+                        src={formData.constanciaVisita.firmaTitular}
+                        alt="Firma del titular"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Sin firma</Typography>
+                    )}
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                    <Button size="small" startIcon={<EditIcon />} onClick={() => openSignatureDialog('titular')}>
+                      {formData.constanciaVisita.firmaTitular ? 'Reemplazar' : 'Capturar Firma'}
+                    </Button>
+                    {formData.constanciaVisita.firmaTitular && (
+                      <Button size="small" color="error" onClick={() => handleConstanciaChange('firmaTitular', '')}>
+                        Borrar
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Huella Digital</Typography>
+                  <Box
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      height: 110,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'background.paper',
+                      mt: 0.5,
+                    }}
+                  >
+                    {formData.constanciaVisita.huellaDigital ? (
+                      <img
+                        src={formData.constanciaVisita.huellaDigital}
+                        alt="Huella digital"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Sin imagen</Typography>
+                    )}
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      startIcon={<FingerprintIcon />}
+                      component="label"
+                    >
+                      {formData.constanciaVisita.huellaDigital ? 'Reemplazar' : 'Subir Huella'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={handleHuellaChange}
+                      />
+                    </Button>
+                    {formData.constanciaVisita.huellaDigital && (
+                      <Button size="small" color="error" onClick={() => handleConstanciaChange('huellaDigital', '')}>
+                        Borrar
+                      </Button>
+                    )}
+                  </Box>
+                  {huellaError && (
+                    <Alert severity="error" sx={{ mt: 1 }} onClose={() => setHuellaError(null)}>
+                      {huellaError}
+                    </Alert>
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Profesional de Diagnóstico
+                </Typography>
+                <TextField
+                  fullWidth label="Nombre" size="small" sx={{ mb: 1 }}
+                  value={formData.constanciaVisita.profesional.nombre}
+                  onChange={(e) => handleProfesionalChange('nombre', e.target.value)}
+                />
+                <TextField
+                  fullWidth label="No. Documento" size="small" sx={{ mb: 1 }}
+                  value={formData.constanciaVisita.profesional.documento}
+                  onChange={(e) => handleProfesionalChange('documento', e.target.value)}
+                />
+                <TextField
+                  fullWidth label="No. Tarjeta Profesional" size="small" sx={{ mb: 2 }}
+                  value={formData.constanciaVisita.profesional.tarjetaProfesional}
+                  onChange={(e) => handleProfesionalChange('tarjetaProfesional', e.target.value)}
+                />
+
+                <Typography variant="caption" color="text.secondary">Firma del Profesional</Typography>
+                <Box
+                  sx={{
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    height: 110,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'background.paper',
+                    mt: 0.5,
+                  }}
+                >
+                  {formData.constanciaVisita.profesional.firma ? (
+                    <img
+                      src={formData.constanciaVisita.profesional.firma}
+                      alt="Firma del profesional"
+                      style={{ maxHeight: '100%', maxWidth: '100%' }}
+                    />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">Sin firma</Typography>
+                  )}
+                </Box>
+                <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                  <Button size="small" startIcon={<EditIcon />} onClick={() => openSignatureDialog('profesional')}>
+                    {formData.constanciaVisita.profesional.firma ? 'Reemplazar' : 'Capturar Firma'}
+                  </Button>
+                  {formData.constanciaVisita.profesional.firma && (
+                    <Button size="small" color="error" onClick={() => handleProfesionalChange('firma', '')}>
+                      Borrar
+                    </Button>
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} sm={8}>
+              <TextField
+                fullWidth label="Testigo (si aplica) - Nombre"
+                value={formData.constanciaVisita.testigo}
+                onChange={(e) => handleConstanciaChange('testigo', e.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth label="Fecha de Visita" type="date"
+                InputLabelProps={{ shrink: true }}
+                value={formData.constanciaVisita.fechaVisita}
+                onChange={(e) => handleConstanciaChange('fechaVisita', e.target.value)}
+                required
+              />
+            </Grid>
+          </Grid>
+
+          <SignatureDialog
+            open={signatureDialog.open}
+            title={
+              signatureDialog.target === 'titular'
+                ? 'Firma del Titular'
+                : signatureDialog.target === 'profesional'
+                ? 'Firma del Profesional'
+                : 'Firma'
+            }
+            initialDataUrl={
+              signatureDialog.target === 'titular'
+                ? formData.constanciaVisita.firmaTitular
+                : signatureDialog.target === 'profesional'
+                ? formData.constanciaVisita.profesional.firma
+                : ''
+            }
+            onCancel={closeSignatureDialog}
+            onSave={handleSignatureSave}
+          />
         </Grid>
 
         <Grid item xs={12}>

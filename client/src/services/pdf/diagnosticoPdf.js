@@ -322,6 +322,100 @@ const renderMiembros = (doc, data) => {
   );
 };
 
+const drawSignatureBox = (doc, dataUrl, x, y, w, h) => {
+  doc.doc.setDrawColor(150);
+  doc.doc.setLineWidth(0.2);
+  doc.doc.rect(x, y, w, h);
+  if (dataUrl) {
+    try {
+      const props = doc.doc.getImageProperties(dataUrl);
+      const aspect = props.width / props.height;
+      let drawW = w - 4;
+      let drawH = drawW / aspect;
+      if (drawH > h - 4) {
+        drawH = h - 4;
+        drawW = drawH * aspect;
+      }
+      const dx = x + (w - drawW) / 2;
+      const dy = y + (h - drawH) / 2;
+      doc.doc.addImage(dataUrl, 'WEBP', dx, dy, drawW, drawH);
+    } catch (err) {
+      console.warn('No se pudo embeber la imagen en el PDF:', err);
+    }
+  }
+};
+
+const renderConstanciaVisita = (doc, data) => {
+  const constancia = data.constanciaVisita || {};
+  const profesional = constancia.profesional || {};
+  const titular = data.titular || {};
+
+  doc.sectionHeader('I. CONSTANCIA DE VISITA');
+
+  const colW = doc.contentWidth / 2 - 2;
+  const leftX = doc.marginX;
+  const rightX = doc.marginX + colW + 4;
+  const startY = doc.cursorY;
+
+  doc.doc.setFont('helvetica', 'bold');
+  doc.doc.setFontSize(9);
+  doc.doc.setFillColor(...doc.config.headerFill);
+  doc.doc.rect(leftX, startY, colW, 6, 'F');
+  doc.doc.rect(rightX, startY, colW, 6, 'F');
+  doc.doc.setTextColor(...doc.config.headerText);
+  doc.doc.text('TITULAR DEL HOGAR', leftX + 2, startY + 4);
+  doc.doc.text('PROFESIONAL DE DIAGNÓSTICO', rightX + 2, startY + 4);
+  doc.doc.setTextColor(0);
+
+  let yLeft = startY + 9;
+  let yRight = startY + 9;
+
+  const writeField = (label, value, x, y) => {
+    doc.doc.setFont('helvetica', 'bold');
+    doc.doc.setFontSize(7.5);
+    doc.doc.text(label, x, y);
+    doc.doc.setFont('helvetica', 'normal');
+    doc.doc.setFontSize(10);
+    doc.doc.text(String(value ?? ''), x, y + 4.5);
+    doc.doc.setDrawColor(200);
+    doc.doc.line(x, y + 5.5, x + colW - 4, y + 5.5);
+  };
+
+  const titularNombre = `${titular.nombre || ''} ${titular.apellido || ''}`.trim();
+  writeField('NOMBRE', titularNombre, leftX + 2, yLeft);
+  yLeft += 9;
+  writeField('NO. DOCUMENTO', titular.documento, leftX + 2, yLeft);
+  yLeft += 9;
+
+  writeField('NOMBRE', profesional.nombre, rightX + 2, yRight);
+  yRight += 9;
+  writeField('NO. DOCUMENTO', profesional.documento, rightX + 2, yRight);
+  yRight += 9;
+  writeField('NO. TARJETA PROFESIONAL', profesional.tarjetaProfesional, rightX + 2, yRight);
+  yRight += 9;
+
+  const firmaH = 30;
+  const firmaW = (colW - 8) / 2;
+  drawSignatureBox(doc, constancia.firmaTitular, leftX + 2, yLeft, firmaW, firmaH);
+  drawSignatureBox(doc, constancia.huellaDigital, leftX + 2 + firmaW + 4, yLeft, firmaW, firmaH);
+  doc.doc.setFont('helvetica', 'normal');
+  doc.doc.setFontSize(7.5);
+  doc.doc.text('Firma del Titular', leftX + 2 + firmaW / 2, yLeft + firmaH + 3, { align: 'center' });
+  doc.doc.text('Huella Digital', leftX + 2 + firmaW + 4 + firmaW / 2, yLeft + firmaH + 3, { align: 'center' });
+  yLeft += firmaH + 6;
+
+  drawSignatureBox(doc, profesional.firma, rightX + 2, yRight, colW - 4, firmaH);
+  doc.doc.text('Firma del Profesional', rightX + 2 + (colW - 4) / 2, yRight + firmaH + 3, { align: 'center' });
+  yRight += firmaH + 6;
+
+  doc.cursorY = Math.max(yLeft, yRight) + 2;
+
+  doc.fieldRow([
+    { label: 'TESTIGO (SI APLICA) - NOMBRE', value: constancia.testigo },
+    { label: 'FECHA DE VISITA', value: constancia.fechaVisita },
+  ]);
+};
+
 const renderConceptoTecnico = (doc, data) => {
   const concepto = data.conceptoTecnico || {};
   const requisitos = Array.isArray(concepto.requisitosGenerales) ? concepto.requisitosGenerales : [];
@@ -375,6 +469,7 @@ const sections = [
   renderServiciosPublicos,
   renderLevantamiento,
   renderMiembros,
+  renderConstanciaVisita,
   renderConceptoTecnico,
 ];
 
