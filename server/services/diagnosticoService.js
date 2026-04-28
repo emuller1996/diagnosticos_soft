@@ -70,6 +70,7 @@ class DiagnosticoService {
         },
       });
 
+      await client.indices.refresh({ index:this.index });
       const updatedDoc = await this.getById(id);
       return updatedDoc;
     } catch (error) {

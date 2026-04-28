@@ -23,9 +23,11 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon, Edit as EditIcon, Fingerprint as FingerprintIcon } from '@mui/icons-material';
 import { uploadService } from '../../services/uploadService';
 import { resolveStaticUrl } from '../../services/apiClient';
+import { compressImageToWebP } from '../../utils/imageCompression';
+import SignatureDialog from './SignatureDialog';
 
 const MODALIDADES = [
   { value: 'vivienda nueva', label: 'Vivienda Nueva' },
@@ -113,6 +115,20 @@ const MIEMBRO_VACIO = {
   descDiscapacidad: '',
 };
 
+const REQUISITOS_GENERALES = [
+  'El hogar potencial beneficiario acredita a satisfacción la tenencia del predio',
+  'La pendiente y condiciones topográficas de la zona de implantación permiten la construcción de la vivienda',
+  'El predio está localizado en zona apta para el desarrollo de proyectos de vivienda',
+  'El predio cuenta con disponibilidad o acceso a una fuente de agua para consumo humano y doméstico',
+];
+
+const CONDICIONES_VIVIENDA_NUEVA = [
+  'La zona de implantación cumple con el área mínima requerida',
+  'Requiere construcción de sistema de tratamiento de aguas residuales (sistema séptico)',
+  'Se debe realizar conexión a red convencional de recolección y tratamiento de aguas residuales',
+  'La zona de intervención cumple el área mínima para construcción del sistema séptico',
+];
+
 const MIEMBRO_DEFAULT = {
   apellidos: '',
   nombres: '',
@@ -165,12 +181,35 @@ const buildInitialState = (initialData) => {
       croquisUrl: '',
     },
     miembros: [],
+    constanciaVisita: {
+      fechaVisita: '',
+      firmaTitular: '',
+      huellaDigital: '',
+      profesional: { nombre: '', documento: '', tarjetaProfesional: '', firma: '' },
+      testigo: '',
+    },
+    conceptoTecnico: {
+      requisitosGenerales: REQUISITOS_GENERALES.map((requisito) => ({
+        requisito,
+        cumple: null,
+      })),
+      viviendaNueva: {
+        aplica: null,
+        condiciones: CONDICIONES_VIVIENDA_NUEVA.map((condicion) => ({
+          condicion,
+          valor: null,
+        })),
+      },
+    },
   };
 
   if (!initialData) return defaults;
 
   const incomingServicios = initialData.serviciosPublicos || {};
   const incomingLevantamiento = initialData.levantamiento || {};
+  const incomingConcepto = initialData.conceptoTecnico || {};
+  const incomingViviendaNueva = incomingConcepto.viviendaNueva || {};
+  const incomingConstancia = initialData.constanciaVisita || {};
 
   return {
     ...defaults,
@@ -210,6 +249,32 @@ const buildInitialState = (initialData) => {
     miembros: Array.isArray(initialData.miembros)
       ? initialData.miembros.map((m) => ({ ...MIEMBRO_VACIO, ...m }))
       : [],
+    constanciaVisita: {
+      ...defaults.constanciaVisita,
+      ...incomingConstancia,
+      profesional: {
+        ...defaults.constanciaVisita.profesional,
+        ...(incomingConstancia.profesional || {}),
+      },
+    },
+    conceptoTecnico: {
+      requisitosGenerales:
+        Array.isArray(incomingConcepto.requisitosGenerales) &&
+        incomingConcepto.requisitosGenerales.length === REQUISITOS_GENERALES.length
+          ? incomingConcepto.requisitosGenerales
+          : defaults.conceptoTecnico.requisitosGenerales,
+      viviendaNueva: {
+        aplica:
+          typeof incomingViviendaNueva.aplica === 'boolean'
+            ? incomingViviendaNueva.aplica
+            : null,
+        condiciones:
+          Array.isArray(incomingViviendaNueva.condiciones) &&
+          incomingViviendaNueva.condiciones.length === CONDICIONES_VIVIENDA_NUEVA.length
+            ? incomingViviendaNueva.condiciones
+            : defaults.conceptoTecnico.viviendaNueva.condiciones,
+      },
+    },
   };
 };
 
@@ -217,6 +282,8 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState(() => buildInitialState(initialData));
   const [croquisUploading, setCroquisUploading] = useState(false);
   const [croquisError, setCroquisError] = useState(null);
+  const [signatureDialog, setSignatureDialog] = useState({ open: false, target: null });
+  const [huellaError, setHuellaError] = useState(null);
 
   const diagnosticoId = initialData?.id;
 
@@ -335,6 +402,83 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   };
 
   const hasIncumplimiento = formData.condicionesAmbientales.some((c) => c.cumple === false);
+
+  const handleRequisitoChange = (index, cumple) => {
+    setFormData((prev) => {
+      const next = [...prev.conceptoTecnico.requisitosGenerales];
+      next[index] = { ...next[index], cumple };
+      return {
+        ...prev,
+        conceptoTecnico: { ...prev.conceptoTecnico, requisitosGenerales: next },
+      };
+    });
+  };
+
+  const handleViviendaNuevaAplica = (aplica) => {
+    setFormData((prev) => ({
+      ...prev,
+      conceptoTecnico: {
+        ...prev.conceptoTecnico,
+        viviendaNueva: { ...prev.conceptoTecnico.viviendaNueva, aplica },
+      },
+    }));
+  };
+
+  const handleViviendaNuevaCondicionChange = (index, valor) => {
+    setFormData((prev) => {
+      const next = [...prev.conceptoTecnico.viviendaNueva.condiciones];
+      next[index] = { ...next[index], valor };
+      return {
+        ...prev,
+        conceptoTecnico: {
+          ...prev.conceptoTecnico,
+          viviendaNueva: { ...prev.conceptoTecnico.viviendaNueva, condiciones: next },
+        },
+      };
+    });
+  };
+
+  const handleConstanciaChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      constanciaVisita: { ...prev.constanciaVisita, [field]: value },
+    }));
+  };
+
+  const handleProfesionalChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      constanciaVisita: {
+        ...prev.constanciaVisita,
+        profesional: { ...prev.constanciaVisita.profesional, [field]: value },
+      },
+    }));
+  };
+
+  const openSignatureDialog = (target) => setSignatureDialog({ open: true, target });
+  const closeSignatureDialog = () => setSignatureDialog({ open: false, target: null });
+
+  const handleSignatureSave = (dataUrl) => {
+    if (signatureDialog.target === 'titular') {
+      handleConstanciaChange('firmaTitular', dataUrl);
+    } else if (signatureDialog.target === 'profesional') {
+      handleProfesionalChange('firma', dataUrl);
+    }
+    closeSignatureDialog();
+  };
+
+  const handleHuellaChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setHuellaError(null);
+    try {
+      const { dataUrl } = await compressImageToWebP(file, { maxWidth: 800, maxHeight: 800, quality: 0.75 });
+      handleConstanciaChange('huellaDigital', dataUrl);
+    } catch (err) {
+      setHuellaError(err.message || 'No se pudo procesar la huella.');
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -986,6 +1130,315 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               </TableBody>
             </Table>
           </TableContainer>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">I. Constancia de Visita</Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Titular del Hogar
+                </Typography>
+                <TextField
+                  fullWidth label="Nombre" size="small" sx={{ mb: 1 }}
+                  value={`${formData.titular.nombre || ''} ${formData.titular.apellido || ''}`.trim()}
+                  InputProps={{ readOnly: true }}
+                  helperText="Tomado de la sección A"
+                />
+                <TextField
+                  fullWidth label="No. Documento" size="small" sx={{ mb: 2 }}
+                  value={formData.titular.documento || ''}
+                  InputProps={{ readOnly: true }}
+                />
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">Firma del Titular</Typography>
+                  <Box
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      height: 110,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'background.paper',
+                      mt: 0.5,
+                    }}
+                  >
+                    {formData.constanciaVisita.firmaTitular ? (
+                      <img
+                        src={formData.constanciaVisita.firmaTitular}
+                        alt="Firma del titular"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Sin firma</Typography>
+                    )}
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                    <Button size="small" startIcon={<EditIcon />} onClick={() => openSignatureDialog('titular')}>
+                      {formData.constanciaVisita.firmaTitular ? 'Reemplazar' : 'Capturar Firma'}
+                    </Button>
+                    {formData.constanciaVisita.firmaTitular && (
+                      <Button size="small" color="error" onClick={() => handleConstanciaChange('firmaTitular', '')}>
+                        Borrar
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Huella Digital</Typography>
+                  <Box
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      height: 110,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'background.paper',
+                      mt: 0.5,
+                    }}
+                  >
+                    {formData.constanciaVisita.huellaDigital ? (
+                      <img
+                        src={formData.constanciaVisita.huellaDigital}
+                        alt="Huella digital"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }}
+                      />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Sin imagen</Typography>
+                    )}
+                  </Box>
+                  <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      startIcon={<FingerprintIcon />}
+                      component="label"
+                    >
+                      {formData.constanciaVisita.huellaDigital ? 'Reemplazar' : 'Subir Huella'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={handleHuellaChange}
+                      />
+                    </Button>
+                    {formData.constanciaVisita.huellaDigital && (
+                      <Button size="small" color="error" onClick={() => handleConstanciaChange('huellaDigital', '')}>
+                        Borrar
+                      </Button>
+                    )}
+                  </Box>
+                  {huellaError && (
+                    <Alert severity="error" sx={{ mt: 1 }} onClose={() => setHuellaError(null)}>
+                      {huellaError}
+                    </Alert>
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                  Profesional de Diagnóstico
+                </Typography>
+                <TextField
+                  fullWidth label="Nombre" size="small" sx={{ mb: 1 }}
+                  value={formData.constanciaVisita.profesional.nombre}
+                  onChange={(e) => handleProfesionalChange('nombre', e.target.value)}
+                />
+                <TextField
+                  fullWidth label="No. Documento" size="small" sx={{ mb: 1 }}
+                  value={formData.constanciaVisita.profesional.documento}
+                  onChange={(e) => handleProfesionalChange('documento', e.target.value)}
+                />
+                <TextField
+                  fullWidth label="No. Tarjeta Profesional" size="small" sx={{ mb: 2 }}
+                  value={formData.constanciaVisita.profesional.tarjetaProfesional}
+                  onChange={(e) => handleProfesionalChange('tarjetaProfesional', e.target.value)}
+                />
+
+                <Typography variant="caption" color="text.secondary">Firma del Profesional</Typography>
+                <Box
+                  sx={{
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    height: 110,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'background.paper',
+                    mt: 0.5,
+                  }}
+                >
+                  {formData.constanciaVisita.profesional.firma ? (
+                    <img
+                      src={formData.constanciaVisita.profesional.firma}
+                      alt="Firma del profesional"
+                      style={{ maxHeight: '100%', maxWidth: '100%' }}
+                    />
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">Sin firma</Typography>
+                  )}
+                </Box>
+                <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                  <Button size="small" startIcon={<EditIcon />} onClick={() => openSignatureDialog('profesional')}>
+                    {formData.constanciaVisita.profesional.firma ? 'Reemplazar' : 'Capturar Firma'}
+                  </Button>
+                  {formData.constanciaVisita.profesional.firma && (
+                    <Button size="small" color="error" onClick={() => handleProfesionalChange('firma', '')}>
+                      Borrar
+                    </Button>
+                  )}
+                </Box>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} sm={8}>
+              <TextField
+                fullWidth label="Testigo (si aplica) - Nombre"
+                value={formData.constanciaVisita.testigo}
+                onChange={(e) => handleConstanciaChange('testigo', e.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth label="Fecha de Visita" type="date"
+                InputLabelProps={{ shrink: true }}
+                value={formData.constanciaVisita.fechaVisita}
+                onChange={(e) => handleConstanciaChange('fechaVisita', e.target.value)}
+                required
+              />
+            </Grid>
+          </Grid>
+
+          <SignatureDialog
+            open={signatureDialog.open}
+            title={
+              signatureDialog.target === 'titular'
+                ? 'Firma del Titular'
+                : signatureDialog.target === 'profesional'
+                ? 'Firma del Profesional'
+                : 'Firma'
+            }
+            initialDataUrl={
+              signatureDialog.target === 'titular'
+                ? formData.constanciaVisita.firmaTitular
+                : signatureDialog.target === 'profesional'
+                ? formData.constanciaVisita.profesional.firma
+                : ''
+            }
+            onCancel={closeSignatureDialog}
+            onSave={handleSignatureSave}
+          />
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">J. Concepto Técnico - Diagnóstico Integral</Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Validación Requisitos Generales
+            </Typography>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Requisito</strong></TableCell>
+                    <TableCell align="center" sx={{ width: 100 }}><strong>Cumple</strong></TableCell>
+                    <TableCell align="center" sx={{ width: 100 }}><strong>No Cumple</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {formData.conceptoTecnico.requisitosGenerales.map((req, index) => (
+                    <TableRow key={req.requisito}>
+                      <TableCell>{`${String.fromCharCode(97 + index)}) ${req.requisito}`}</TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          checked={req.cumple === true}
+                          onChange={() => handleRequisitoChange(index, true)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          checked={req.cumple === false}
+                          onChange={() => handleRequisitoChange(index, false)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Validación Modalidad Vivienda Nueva
+            </Typography>
+            <RadioGroup
+              row
+              value={
+                formData.conceptoTecnico.viviendaNueva.aplica === true
+                  ? 'aplica'
+                  : formData.conceptoTecnico.viviendaNueva.aplica === false
+                  ? 'no_aplica'
+                  : ''
+              }
+              onChange={(e) => handleViviendaNuevaAplica(e.target.value === 'aplica')}
+              sx={{ mb: 1 }}
+            >
+              <FormControlLabel value="aplica" control={<Radio size="small" />} label="APLICA" />
+              <FormControlLabel value="no_aplica" control={<Radio size="small" />} label="NO APLICA" />
+            </RadioGroup>
+
+            {formData.conceptoTecnico.viviendaNueva.aplica === true && (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Condición</strong></TableCell>
+                      <TableCell align="center" sx={{ width: 80 }}><strong>SI</strong></TableCell>
+                      <TableCell align="center" sx={{ width: 80 }}><strong>NO</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {formData.conceptoTecnico.viviendaNueva.condiciones.map((cond, index) => (
+                      <TableRow key={cond.condicion}>
+                        <TableCell>{`${String.fromCharCode(97 + index)}) ${cond.condicion}`}</TableCell>
+                        <TableCell align="center">
+                          <Radio
+                            size="small"
+                            checked={cond.valor === true}
+                            onChange={() => handleViviendaNuevaCondicionChange(index, true)}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Radio
+                            size="small"
+                            checked={cond.valor === false}
+                            onChange={() => handleViviendaNuevaCondicionChange(index, false)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
         </Grid>
 
         <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
