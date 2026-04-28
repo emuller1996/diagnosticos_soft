@@ -113,6 +113,20 @@ const MIEMBRO_VACIO = {
   descDiscapacidad: '',
 };
 
+const REQUISITOS_GENERALES = [
+  'El hogar potencial beneficiario acredita a satisfacción la tenencia del predio',
+  'La pendiente y condiciones topográficas de la zona de implantación permiten la construcción de la vivienda',
+  'El predio está localizado en zona apta para el desarrollo de proyectos de vivienda',
+  'El predio cuenta con disponibilidad o acceso a una fuente de agua para consumo humano y doméstico',
+];
+
+const CONDICIONES_VIVIENDA_NUEVA = [
+  'La zona de implantación cumple con el área mínima requerida',
+  'Requiere construcción de sistema de tratamiento de aguas residuales (sistema séptico)',
+  'Se debe realizar conexión a red convencional de recolección y tratamiento de aguas residuales',
+  'La zona de intervención cumple el área mínima para construcción del sistema séptico',
+];
+
 const MIEMBRO_DEFAULT = {
   apellidos: '',
   nombres: '',
@@ -165,12 +179,27 @@ const buildInitialState = (initialData) => {
       croquisUrl: '',
     },
     miembros: [],
+    conceptoTecnico: {
+      requisitosGenerales: REQUISITOS_GENERALES.map((requisito) => ({
+        requisito,
+        cumple: null,
+      })),
+      viviendaNueva: {
+        aplica: null,
+        condiciones: CONDICIONES_VIVIENDA_NUEVA.map((condicion) => ({
+          condicion,
+          valor: null,
+        })),
+      },
+    },
   };
 
   if (!initialData) return defaults;
 
   const incomingServicios = initialData.serviciosPublicos || {};
   const incomingLevantamiento = initialData.levantamiento || {};
+  const incomingConcepto = initialData.conceptoTecnico || {};
+  const incomingViviendaNueva = incomingConcepto.viviendaNueva || {};
 
   return {
     ...defaults,
@@ -210,6 +239,24 @@ const buildInitialState = (initialData) => {
     miembros: Array.isArray(initialData.miembros)
       ? initialData.miembros.map((m) => ({ ...MIEMBRO_VACIO, ...m }))
       : [],
+    conceptoTecnico: {
+      requisitosGenerales:
+        Array.isArray(incomingConcepto.requisitosGenerales) &&
+        incomingConcepto.requisitosGenerales.length === REQUISITOS_GENERALES.length
+          ? incomingConcepto.requisitosGenerales
+          : defaults.conceptoTecnico.requisitosGenerales,
+      viviendaNueva: {
+        aplica:
+          typeof incomingViviendaNueva.aplica === 'boolean'
+            ? incomingViviendaNueva.aplica
+            : null,
+        condiciones:
+          Array.isArray(incomingViviendaNueva.condiciones) &&
+          incomingViviendaNueva.condiciones.length === CONDICIONES_VIVIENDA_NUEVA.length
+            ? incomingViviendaNueva.condiciones
+            : defaults.conceptoTecnico.viviendaNueva.condiciones,
+      },
+    },
   };
 };
 
@@ -335,6 +382,41 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   };
 
   const hasIncumplimiento = formData.condicionesAmbientales.some((c) => c.cumple === false);
+
+  const handleRequisitoChange = (index, cumple) => {
+    setFormData((prev) => {
+      const next = [...prev.conceptoTecnico.requisitosGenerales];
+      next[index] = { ...next[index], cumple };
+      return {
+        ...prev,
+        conceptoTecnico: { ...prev.conceptoTecnico, requisitosGenerales: next },
+      };
+    });
+  };
+
+  const handleViviendaNuevaAplica = (aplica) => {
+    setFormData((prev) => ({
+      ...prev,
+      conceptoTecnico: {
+        ...prev.conceptoTecnico,
+        viviendaNueva: { ...prev.conceptoTecnico.viviendaNueva, aplica },
+      },
+    }));
+  };
+
+  const handleViviendaNuevaCondicionChange = (index, valor) => {
+    setFormData((prev) => {
+      const next = [...prev.conceptoTecnico.viviendaNueva.condiciones];
+      next[index] = { ...next[index], valor };
+      return {
+        ...prev,
+        conceptoTecnico: {
+          ...prev.conceptoTecnico,
+          viviendaNueva: { ...prev.conceptoTecnico.viviendaNueva, condiciones: next },
+        },
+      };
+    });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -986,6 +1068,105 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               </TableBody>
             </Table>
           </TableContainer>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">J. Concepto Técnico - Diagnóstico Integral</Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Validación Requisitos Generales
+            </Typography>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Requisito</strong></TableCell>
+                    <TableCell align="center" sx={{ width: 100 }}><strong>Cumple</strong></TableCell>
+                    <TableCell align="center" sx={{ width: 100 }}><strong>No Cumple</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {formData.conceptoTecnico.requisitosGenerales.map((req, index) => (
+                    <TableRow key={req.requisito}>
+                      <TableCell>{`${String.fromCharCode(97 + index)}) ${req.requisito}`}</TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          checked={req.cumple === true}
+                          onChange={() => handleRequisitoChange(index, true)}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Radio
+                          size="small"
+                          checked={req.cumple === false}
+                          onChange={() => handleRequisitoChange(index, false)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+              Validación Modalidad Vivienda Nueva
+            </Typography>
+            <RadioGroup
+              row
+              value={
+                formData.conceptoTecnico.viviendaNueva.aplica === true
+                  ? 'aplica'
+                  : formData.conceptoTecnico.viviendaNueva.aplica === false
+                  ? 'no_aplica'
+                  : ''
+              }
+              onChange={(e) => handleViviendaNuevaAplica(e.target.value === 'aplica')}
+              sx={{ mb: 1 }}
+            >
+              <FormControlLabel value="aplica" control={<Radio size="small" />} label="APLICA" />
+              <FormControlLabel value="no_aplica" control={<Radio size="small" />} label="NO APLICA" />
+            </RadioGroup>
+
+            {formData.conceptoTecnico.viviendaNueva.aplica === true && (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Condición</strong></TableCell>
+                      <TableCell align="center" sx={{ width: 80 }}><strong>SI</strong></TableCell>
+                      <TableCell align="center" sx={{ width: 80 }}><strong>NO</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {formData.conceptoTecnico.viviendaNueva.condiciones.map((cond, index) => (
+                      <TableRow key={cond.condicion}>
+                        <TableCell>{`${String.fromCharCode(97 + index)}) ${cond.condicion}`}</TableCell>
+                        <TableCell align="center">
+                          <Radio
+                            size="small"
+                            checked={cond.valor === true}
+                            onChange={() => handleViviendaNuevaCondicionChange(index, true)}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Radio
+                            size="small"
+                            checked={cond.valor === false}
+                            onChange={() => handleViviendaNuevaCondicionChange(index, false)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
         </Grid>
 
         <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>

@@ -322,6 +322,49 @@ const renderMiembros = (doc, data) => {
   );
 };
 
+const renderConceptoTecnico = (doc, data) => {
+  const concepto = data.conceptoTecnico || {};
+  const requisitos = Array.isArray(concepto.requisitosGenerales) ? concepto.requisitosGenerales : [];
+  const viviendaNueva = concepto.viviendaNueva || {};
+  const condiciones = Array.isArray(viviendaNueva.condiciones) ? viviendaNueva.condiciones : [];
+
+  doc.sectionHeader('J. CONCEPTO TÉCNICO - DIAGNÓSTICO INTEGRAL');
+
+  doc.subtitle('VALIDACIÓN REQUISITOS GENERALES', { size: 9, color: [0, 0, 0] });
+  const requisitosRows = requisitos.map((r, i) => [
+    `${String.fromCharCode(97 + i)}) ${r.requisito}`,
+    r.cumple === true ? 'X' : '',
+    r.cumple === false ? 'X' : '',
+  ]);
+  doc.table(['REQUISITO', 'CUMPLE', 'NO CUMPLE'], requisitosRows, {
+    columnStyles: {
+      1: { halign: 'center', cellWidth: 25 },
+      2: { halign: 'center', cellWidth: 25 },
+    },
+  });
+  doc.spacer(2);
+
+  doc.subtitle('VALIDACIÓN MODALIDAD VIVIENDA NUEVA', { size: 9, color: [0, 0, 0] });
+  doc.checkboxList([
+    { label: 'APLICA', checked: viviendaNueva.aplica === true },
+    { label: 'NO APLICA', checked: viviendaNueva.aplica === false },
+  ]);
+
+  if (viviendaNueva.aplica === true) {
+    const condicionesRows = condiciones.map((c, i) => [
+      `${String.fromCharCode(97 + i)}) ${c.condicion}`,
+      c.valor === true ? 'X' : '',
+      c.valor === false ? 'X' : '',
+    ]);
+    doc.table(['CONDICIÓN', 'SI', 'NO'], condicionesRows, {
+      columnStyles: {
+        1: { halign: 'center', cellWidth: 20 },
+        2: { halign: 'center', cellWidth: 20 },
+      },
+    });
+  }
+};
+
 const sections = [
   renderHeader,
   renderTitular,
@@ -332,6 +375,7 @@ const sections = [
   renderServiciosPublicos,
   renderLevantamiento,
   renderMiembros,
+  renderConceptoTecnico,
 ];
 
 const fetchAsDataUrl = async (url) => {
@@ -371,6 +415,6 @@ export const downloadDiagnosticoPdf = async (data, filename) => {
   const id = data?.id || 'documento';
   const name = filename || `diagnostico-${consecutivo || id}.pdf`;
 
-  doc.save(name);
+  //doc.save(name);
   doc.preview();
 };
