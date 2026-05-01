@@ -13,7 +13,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Enable CORS
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins.length ? allowedOrigins : true,
+    credentials: true,
+  })
+);
 
 app.use(morgan("dev"));
 
@@ -31,6 +41,17 @@ app.use('/api/diagnosticos', diagnosticoRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
+});
+
+// Error handler — ensures CORS headers are present on error responses
+// (some hosts/proxies strip them, which surfaces as "CORS error" in the browser)
+app.use((err, req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.status(err.status || 500).json({ message: err.message || 'Internal error' });
 });
 
 app.listen(PORT, () => {

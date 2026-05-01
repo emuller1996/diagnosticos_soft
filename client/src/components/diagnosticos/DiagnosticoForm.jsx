@@ -26,7 +26,6 @@ import {
 import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon, Edit as EditIcon, Fingerprint as FingerprintIcon } from '@mui/icons-material';
 import { uploadService } from '../../services/uploadService';
 import { resolveStaticUrl } from '../../services/apiClient';
-import { compressImageToWebP } from '../../utils/imageCompression';
 import SignatureDialog from './SignatureDialog';
 
 const MODALIDADES = [
@@ -284,6 +283,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const [croquisError, setCroquisError] = useState(null);
   const [signatureDialog, setSignatureDialog] = useState({ open: false, target: null });
   const [huellaError, setHuellaError] = useState(null);
+  const [huellaUploading, setHuellaUploading] = useState(false);
 
   const diagnosticoId = initialData?.id;
 
@@ -471,13 +471,25 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    setHuellaError(null);
-    try {
-      const { dataUrl } = await compressImageToWebP(file, { maxWidth: 800, maxHeight: 800, quality: 0.75 });
-      handleConstanciaChange('huellaDigital', dataUrl);
-    } catch (err) {
-      setHuellaError(err.message || 'No se pudo procesar la huella.');
+    if (!diagnosticoId) {
+      setHuellaError('Guardá el diagnóstico antes de subir la huella.');
+      return;
     }
+    setHuellaError(null);
+    setHuellaUploading(true);
+    try {
+      const updated = await uploadService.uploadHuella(diagnosticoId, file);
+      handleConstanciaChange('huellaDigital', updated?.constanciaVisita?.huellaDigital || '');
+    } catch (err) {
+      setHuellaError(err?.response?.data?.message || err.message || 'Error subiendo la huella.');
+    } finally {
+      setHuellaUploading(false);
+    }
+  };
+
+  const huellaSrc = (value) => {
+    if (!value) return '';
+    return value.startsWith('data:') ? value : resolveStaticUrl(value);
   };
 
   const handleSubmit = (e) => {
@@ -1208,7 +1220,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                   >
                     {formData.constanciaVisita.huellaDigital ? (
                       <img
-                        src={formData.constanciaVisita.huellaDigital}
+                        src={huellaSrc(formData.constanciaVisita.huellaDigital)}
                         alt="Huella digital"
                         style={{ maxHeight: '100%', maxWidth: '100%' }}
                       />
@@ -1216,11 +1228,12 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                       <Typography variant="caption" color="text.secondary">Sin imagen</Typography>
                     )}
                   </Box>
-                  <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                  <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
                     <Button
                       size="small"
-                      startIcon={<FingerprintIcon />}
+                      startIcon={huellaUploading ? <CircularProgress size={16} /> : <FingerprintIcon />}
                       component="label"
+                      disabled={!diagnosticoId || huellaUploading}
                     >
                       {formData.constanciaVisita.huellaDigital ? 'Reemplazar' : 'Subir Huella'}
                       <input
@@ -1236,6 +1249,11 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                       </Button>
                     )}
                   </Box>
+                  {!diagnosticoId && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      Guardá el diagnóstico para habilitar la subida.
+                    </Typography>
+                  )}
                   {huellaError && (
                     <Alert severity="error" sx={{ mt: 1 }} onClose={() => setHuellaError(null)}>
                       {huellaError}
