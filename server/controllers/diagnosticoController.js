@@ -1,5 +1,6 @@
 import diagnosticoService from '../services/diagnosticoService.js';
 import { saveCroquisAsWebP, deleteCroquisFile } from '../services/croquisService.js';
+import { saveHuellaAsWebP, deleteHuellaFile } from '../services/huellaService.js';
 
 export const getAllDiagnosticos = async (req, res) => {
   try {
@@ -76,6 +77,42 @@ export const uploadCroquis = async (req, res) => {
 
     const updated = await diagnosticoService.update(req.params.id, {
       levantamiento: { ...(diag.levantamiento || {}), croquisUrl: url, croquisSizeBytes: sizeBytes },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    if (error.message === 'Diagnóstico no encontrado') {
+      return res.status(404).json({ message: error.message });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const uploadHuella = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No se envió ningún archivo de imagen.' });
+    }
+
+    const diag = await diagnosticoService.getById(req.params.id);
+    const documento = diag.titular?.documento;
+
+    const previousUrl = diag.constanciaVisita?.huellaDigital;
+    const { url, sizeBytes } = await saveHuellaAsWebP(req.file.buffer, {
+      documento,
+      id: req.params.id,
+    });
+
+    if (previousUrl && previousUrl !== url && previousUrl.startsWith('/uploads/')) {
+      await deleteHuellaFile(previousUrl);
+    }
+
+    const updated = await diagnosticoService.update(req.params.id, {
+      constanciaVisita: {
+        ...(diag.constanciaVisita || {}),
+        huellaDigital: url,
+        huellaSizeBytes: sizeBytes,
+      },
     });
 
     res.json(updated);

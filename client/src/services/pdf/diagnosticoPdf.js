@@ -397,7 +397,7 @@ const renderConstanciaVisita = (doc, data) => {
   const firmaH = 30;
   const firmaW = (colW - 8) / 2;
   drawSignatureBox(doc, constancia.firmaTitular, leftX + 2, yLeft, firmaW, firmaH);
-  drawSignatureBox(doc, constancia.huellaDigital, leftX + 2 + firmaW + 4, yLeft, firmaW, firmaH);
+  drawSignatureBox(doc, data._huellaDataUrl, leftX + 2 + firmaW + 4, yLeft, firmaW, firmaH);
   doc.doc.setFont('helvetica', 'normal');
   doc.doc.setFontSize(7.5);
   doc.doc.text('Firma del Titular', leftX + 2 + firmaW / 2, yLeft + firmaH + 3, { align: 'center' });
@@ -485,16 +485,30 @@ const fetchAsDataUrl = async (url) => {
   });
 };
 
-const hydrateCroquis = async (data) => {
-  const url = data?.levantamiento?.croquisUrl;
-  if (!url) return data;
-  try {
-    const dataUrl = await fetchAsDataUrl(resolveStaticUrl(url));
-    return { ...data, _croquisDataUrl: dataUrl };
-  } catch (err) {
-    console.warn('No se pudo cargar el croquis para el PDF:', err);
-    return data;
+const hydrateAssets = async (data) => {
+  const out = { ...data };
+
+  const croquisUrl = data?.levantamiento?.croquisUrl;
+  if (croquisUrl) {
+    try {
+      out._croquisDataUrl = await fetchAsDataUrl(resolveStaticUrl(croquisUrl));
+    } catch (err) {
+      console.warn('No se pudo cargar el croquis para el PDF:', err);
+    }
   }
+
+  const huella = data?.constanciaVisita?.huellaDigital;
+  if (huella?.startsWith('data:')) {
+    out._huellaDataUrl = huella;
+  } else if (huella) {
+    try {
+      out._huellaDataUrl = await fetchAsDataUrl(resolveStaticUrl(huella));
+    } catch (err) {
+      console.warn('No se pudo cargar la huella para el PDF:', err);
+    }
+  }
+
+  return out;
 };
 
 export const generateDiagnosticoPdf = (data) => {
@@ -504,7 +518,7 @@ export const generateDiagnosticoPdf = (data) => {
 };
 
 export const downloadDiagnosticoPdf = async (data, filename) => {
-  const hydrated = await hydrateCroquis(data);
+  const hydrated = await hydrateAssets(data);
   const doc = generateDiagnosticoPdf(hydrated);
   const consecutivo = data?.metadata?.consecutivoHogar;
   const id = data?.id || 'documento';
