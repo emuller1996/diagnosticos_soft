@@ -518,12 +518,27 @@ export const generateDiagnosticoPdf = (data) => {
 };
 
 export const downloadDiagnosticoPdf = async (data, filename) => {
-  const hydrated = await hydrateAssets(data);
-  const doc = generateDiagnosticoPdf(hydrated);
   const consecutivo = data?.metadata?.consecutivoHogar;
   const id = data?.id || 'documento';
   const name = filename || `diagnostico-${consecutivo || id}.pdf`;
 
-  //doc.save(name);
-  doc.preview();
+  // Reservar la pestaña ANTES del await — los browsers bloquean window.open
+  // post-await porque pierde la marca de "user gesture".
+  const previewWindow = window.open('', '_blank');
+
+  try {
+    const hydrated = await hydrateAssets(data);
+    const doc = generateDiagnosticoPdf(hydrated);
+    const blobUrl = doc.doc.output('bloburl');
+
+    if (previewWindow && !previewWindow.closed) {
+      previewWindow.location.href = blobUrl;
+    } else {
+      // Popup bloqueado — caemos a descarga directa.
+      doc.save(name);
+    }
+  } catch (err) {
+    if (previewWindow && !previewWindow.closed) previewWindow.close();
+    throw err;
+  }
 };

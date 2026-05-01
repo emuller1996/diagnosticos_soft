@@ -30,8 +30,8 @@ app.use(morgan("dev"));
 // Middleware to parse JSON
 app.use(express.json());
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.resolve('uploads')));
+// Serve uploaded files publicly (croquis, huellas, etc.)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Routes
 app.use('/api/users', userRoutes);
