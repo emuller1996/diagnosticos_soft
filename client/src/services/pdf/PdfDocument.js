@@ -25,14 +25,15 @@ export class PdfDocument {
     this.pageHeight = this.doc.internal.pageSize.getHeight();
     this.marginX = config.margin;
     this.marginY = config.margin;
-    this.cursorY = this.marginY;
+    this.headerSpace = config.headerSpace || 0;
+    this.cursorY = this.marginY + this.headerSpace;
     this.contentWidth = this.pageWidth - 2 * this.marginX;
   }
 
   ensureSpace(needed) {
     if (this.cursorY + needed > this.pageHeight - this.marginY) {
       this.doc.addPage();
-      this.cursorY = this.marginY;
+      this.cursorY = this.marginY + this.headerSpace;
       return true;
     }
     return false;
