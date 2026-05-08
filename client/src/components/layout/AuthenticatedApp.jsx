@@ -5,6 +5,7 @@ import DashboardLayout from './DashboardLayout';
 import Dashboard from '../../pages/Dashboard';
 import ProjectsPage from '../../pages/proyectos/ProjectsPage';
 import DiagnosticosPage from '../../pages/diagnosticos/DiagnosticosPage';
+import NuevoDiagnosticoPage from '../../pages/diagnosticos/NuevoDiagnosticoPage';
 
 const AuthenticatedApp = () => {
   const { logout } = useAuth();
@@ -15,6 +16,7 @@ const AuthenticatedApp = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/proyectos" element={<ProjectsPage />} />
         <Route path="/dashboard/diagnosticos" element={<DiagnosticosPage />} />
+        <Route path="/dashboard/diagnosticos/nuevo" element={<NuevoDiagnosticoPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

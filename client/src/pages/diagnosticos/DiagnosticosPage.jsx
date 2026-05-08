@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Container,
   Typography,
@@ -20,12 +21,13 @@ const DiagnosticosPage = () => {
     error,
     search,
     setSearch,
-    createDiagnostico,
     updateDiagnostico,
     inactivateDiagnostico,
   } = useDiagnosticos();
 
-  const [isCreating, setIsCreating] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [editingDiagnostico, setEditingDiagnostico] = useState(null);
   const [notification, setNotification] = useState({
     open: false,
@@ -33,19 +35,26 @@ const DiagnosticosPage = () => {
     severity: "success",
   });
 
-  const handleCreateDiagnostico = async (formData) => {
-    try {
-      await createDiagnostico(formData);
-      showNotification("Diagnóstico creado exitosamente", "success");
-      setIsCreating(false);
-    } catch (error) {
-      showNotification("Error al crear el diagnóstico", "error");
-    }
+  const showNotification = (message, severity) => {
+    setNotification({ open: true, message, severity });
   };
 
-  const handleUpdateDiagnostico = async (formData) => {
+  const handleCloseNotification = () => {
+    setNotification((n) => ({ ...n, open: false }));
+  };
+
+  // Mostrar notificación que llegó vía location.state (ej. desde NuevoDiagnosticoPage)
+  useEffect(() => {
+    if (location.state?.notification) {
+      const { message, severity } = location.state.notification;
+      showNotification(message, severity);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
+  const handleUpdateDiagnostico = async ({ data }) => {
     try {
-      await updateDiagnostico(editingDiagnostico.id, formData);
+      await updateDiagnostico(editingDiagnostico.id, data);
       showNotification("Diagnóstico actualizado exitosamente", "success");
       setEditingDiagnostico(null);
     } catch (error) {
@@ -55,7 +64,6 @@ const DiagnosticosPage = () => {
 
   const handleEditDiagnostico = (diagnostico) => {
     setEditingDiagnostico(diagnostico);
-    setIsCreating(false);
   };
 
   const handleInactivateDiagnostico = async (id) => {
@@ -67,14 +75,6 @@ const DiagnosticosPage = () => {
         showNotification("Error al inactivar el diagnóstico", "error");
       }
     }
-  };
-
-  const showNotification = (message, severity) => {
-    setNotification({ open: true, message, severity });
-  };
-
-  const handleCloseNotification = () => {
-    setNotification({ ...notification, open: false });
   };
 
   return (
@@ -97,11 +97,11 @@ const DiagnosticosPage = () => {
             onChange={(e) => setSearch(e.target.value)}
             sx={{ width: 250 }}
           />
-          {!isCreating && !editingDiagnostico && (
+          {!editingDiagnostico && (
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setIsCreating(true)}
+              onClick={() => navigate("/dashboard/diagnosticos/nuevo")}
             >
               Nuevo Diagnóstico
             </Button>
@@ -115,14 +115,11 @@ const DiagnosticosPage = () => {
         </Alert>
       )}
 
-      {isCreating || editingDiagnostico ? (
+      {editingDiagnostico ? (
         <DiagnosticoForm
           initialData={editingDiagnostico}
-          onSubmit={editingDiagnostico ? handleUpdateDiagnostico : handleCreateDiagnostico}
-          onCancel={() => {
-            setIsCreating(false);
-            setEditingDiagnostico(null);
-          }}
+          onSubmit={handleUpdateDiagnostico}
+          onCancel={() => setEditingDiagnostico(null)}
         />
       ) : (
         <DiagnosticoList
