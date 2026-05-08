@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import {
   Box,
   TextField,
@@ -23,7 +24,13 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as CloudUploadIcon, Edit as EditIcon, Fingerprint as FingerprintIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  CloudUpload as CloudUploadIcon,
+  Edit as EditIcon,
+  Fingerprint as FingerprintIcon,
+} from '@mui/icons-material';
 import { uploadService } from '../../services/uploadService';
 import { resolveStaticUrl } from '../../services/apiClient';
 import SignatureDialog from './SignatureDialog';
@@ -128,17 +135,6 @@ const CONDICIONES_VIVIENDA_NUEVA = [
   'La zona de intervención cumple el área mínima para construcción del sistema séptico',
 ];
 
-const MIEMBRO_DEFAULT = {
-  apellidos: '',
-  nombres: '',
-  documento: '',
-  alteracionMovilidad: false,
-  ciegoSordo: false,
-  altNeurologica: false,
-  condEscaleras: false,
-  descDiscapacidad: '',
-};
-
 const buildInitialState = (initialData) => {
   const defaults = {
     metadata: {
@@ -219,7 +215,8 @@ const buildInitialState = (initialData) => {
     actividadProductiva: { ...defaults.actividadProductiva, ...(initialData.actividadProductiva || {}) },
     tenenciaPredio: { ...defaults.tenenciaPredio, ...(initialData.tenenciaPredio || {}) },
     condicionesAmbientales:
-      Array.isArray(initialData.condicionesAmbientales) && initialData.condicionesAmbientales.length === CONDICIONES_AMBIENTALES.length
+      Array.isArray(initialData.condicionesAmbientales) &&
+      initialData.condicionesAmbientales.length === CONDICIONES_AMBIENTALES.length
         ? initialData.condicionesAmbientales
         : defaults.condicionesAmbientales,
     causasNoCumple: { ...defaults.causasNoCumple, ...(initialData.causasNoCumple || {}) },
@@ -234,7 +231,7 @@ const buildInitialState = (initialData) => {
       },
       energia: {
         ...defaults.serviciosPublicos.energia,
-        ...(incomingServicios.energia || {}), 
+        ...(incomingServicios.energia || {}),
       },
     },
     levantamiento: {
@@ -277,182 +274,130 @@ const buildInitialState = (initialData) => {
   };
 };
 
-const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
-  const [formData, setFormData] = useState(() => buildInitialState(initialData));
-  const [croquisUploading, setCroquisUploading] = useState(false);
-  const [croquisError, setCroquisError] = useState(null);
-  const [signatureDialog, setSignatureDialog] = useState({ open: false, target: null });
-  const [huellaError, setHuellaError] = useState(null);
-  const [huellaUploading, setHuellaUploading] = useState(false);
+const requiredRule = { required: 'Campo requerido' };
 
+const huellaSrc = (value) => {
+  if (!value) return '';
+  return value.startsWith('data:') ? value : resolveStaticUrl(value);
+};
+
+const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
+  const isEdit = !!initialData?.id;
   const diagnosticoId = initialData?.id;
 
-  const handleSectionChange = (section, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [section]: { ...prev[section], [field]: value },
-    }));
-  };
+  const { control, handleSubmit, watch, setValue, reset } = useForm({
+    defaultValues: buildInitialState(initialData),
+  });
 
-  const handleBaseChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  // Reset si el padre swappea initialData sin desmontar
+  useEffect(() => {
+    reset(buildInitialState(initialData));
+  }, [initialData, reset]);
 
-  const handleCondicionChange = (index, cumple) => {
-    setFormData((prev) => {
-      const next = [...prev.condicionesAmbientales];
-      next[index] = { ...next[index], cumple };
-      return { ...prev, condicionesAmbientales: next };
-    });
-  };
+  const miembrosArray = useFieldArray({ control, name: 'miembros' });
 
-  const toggleCausa = (causa) => {
-    setFormData((prev) => {
-      const current = prev.causasNoCumple.causas;
-      const causas = current.includes(causa)
-        ? current.filter((c) => c !== causa)
-        : [...current, causa];
-      return { ...prev, causasNoCumple: { ...prev.causasNoCumple, causas } };
-    });
-  };
+  // Files locales (CREATE mode) — no entran al form state
+  const [croquisFile, setCroquisFile] = useState(null);
+  const [huellaFile, setHuellaFile] = useState(null);
 
-  const handleServicioChange = (subsection, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      serviciosPublicos: {
-        ...prev.serviciosPublicos,
-        [subsection]: { ...prev.serviciosPublicos[subsection], [field]: value },
-      },
-    }));
-  };
+  // Estado de uploads en EDIT (cuando una imagen está faltante y se sube ahí mismo)
+  const [croquisUploading, setCroquisUploading] = useState(false);
+  const [croquisError, setCroquisError] = useState(null);
+  const [huellaUploading, setHuellaUploading] = useState(false);
+  const [huellaError, setHuellaError] = useState(null);
 
-  const toggleFuenteAgua = (fuente) => {
-    setFormData((prev) => {
-      const current = prev.serviciosPublicos.abastecimientoAgua.fuentes;
-      const fuentes = current.includes(fuente)
-        ? current.filter((f) => f !== fuente)
-        : [...current, fuente];
-      return {
-        ...prev,
-        serviciosPublicos: {
-          ...prev.serviciosPublicos,
-          abastecimientoAgua: { ...prev.serviciosPublicos.abastecimientoAgua, fuentes },
-        },
-      };
-    });
-  };
+  const [signatureDialog, setSignatureDialog] = useState({ open: false, target: null });
 
-  const togglePremisa = (premisa) => {
-    setFormData((prev) => {
-      const current = prev.levantamiento.premisas;
-      const premisas = current.includes(premisa)
-        ? current.filter((p) => p !== premisa)
-        : [...current, premisa];
-      return {
-        ...prev,
-        levantamiento: { ...prev.levantamiento, premisas },
-      };
-    });
-  };
+  // Watched values para conditional rendering
+  const actividadTiene = watch('actividadProductiva.tiene');
+  const actividadTipo = watch('actividadProductiva.tipo');
+  const tenenciaTipo = watch('tenenciaPredio.tipo');
+  const condicionesAmbientales = watch('condicionesAmbientales') || [];
+  const causasSeleccionadas = watch('causasNoCumple.causas') || [];
+  const aguaFuentes = watch('serviciosPublicos.abastecimientoAgua.fuentes') || [];
+  const aguasResidualesTipo = watch('serviciosPublicos.aguasResiduales.tipo');
+  const energiaTipo = watch('serviciosPublicos.energia.tipo');
+  const croquisUrl = watch('levantamiento.croquisUrl');
+  const titularNombre = watch('titular.nombre');
+  const titularApellido = watch('titular.apellido');
+  const titularDocumento = watch('titular.documento');
+  const firmaTitular = watch('constanciaVisita.firmaTitular');
+  const firmaProfesional = watch('constanciaVisita.profesional.firma');
+  const huellaDigital = watch('constanciaVisita.huellaDigital');
+  const consecutivoHogar = watch('metadata.consecutivoHogar');
+  const viviendaNuevaAplica = watch('conceptoTecnico.viviendaNueva.aplica');
 
-  const handleCaracteristicaChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      levantamiento: {
-        ...prev.levantamiento,
-        caracteristicas: { ...prev.levantamiento.caracteristicas, [field]: value },
-      },
-    }));
-  };
+  const hasIncumplimiento = condicionesAmbientales.some((c) => c.cumple === false);
 
-  const addMiembro = () => {
-    setFormData((prev) => ({ ...prev, miembros: [...prev.miembros, { ...MIEMBRO_VACIO }] }));
-  };
+  // Previews de los files locales (CREATE)
+  const croquisFilePreview = useMemo(
+    () => (croquisFile ? URL.createObjectURL(croquisFile) : ''),
+    [croquisFile]
+  );
+  useEffect(
+    () => () => {
+      if (croquisFilePreview) URL.revokeObjectURL(croquisFilePreview);
+    },
+    [croquisFilePreview]
+  );
 
-  const removeMiembro = (index) => {
-    setFormData((prev) => ({ ...prev, miembros: prev.miembros.filter((_, i) => i !== index) }));
-  };
+  const huellaFilePreview = useMemo(
+    () => (huellaFile ? URL.createObjectURL(huellaFile) : ''),
+    [huellaFile]
+  );
+  useEffect(
+    () => () => {
+      if (huellaFilePreview) URL.revokeObjectURL(huellaFilePreview);
+    },
+    [huellaFilePreview]
+  );
 
-  const handleMiembroChange = (index, field, value) => {
-    setFormData((prev) => {
-      const next = [...prev.miembros];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, miembros: next };
-    });
-  };
+  const showCroquisUpload = !isEdit || !croquisUrl;
+  const showHuellaUpload = !isEdit || !huellaDigital;
 
-  const handleCroquisUpload = async (file) => {
-    if (!file || !diagnosticoId) return;
-    setCroquisError(null);
-    setCroquisUploading(true);
-    try {
-      const updated = await uploadService.uploadCroquis(diagnosticoId, file);
-      setFormData((prev) => ({
-        ...prev,
-        levantamiento: {
-          ...prev.levantamiento,
-          croquisUrl: updated?.levantamiento?.croquisUrl || '',
-        },
-      }));
-    } catch (err) {
-      setCroquisError(err?.response?.data?.message || err.message || 'Error subiendo el croquis.');
-    } finally {
-      setCroquisUploading(false);
+  const handleCroquisFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (isEdit && diagnosticoId) {
+      // EDIT con croquis faltante — sube directo al endpoint
+      setCroquisError(null);
+      setCroquisUploading(true);
+      try {
+        const updated = await uploadService.uploadCroquis(diagnosticoId, file);
+        setValue('levantamiento.croquisUrl', updated?.levantamiento?.croquisUrl || '', {
+          shouldDirty: true,
+        });
+      } catch (err) {
+        setCroquisError(err?.response?.data?.message || err.message || 'Error subiendo el croquis.');
+      } finally {
+        setCroquisUploading(false);
+      }
+    } else {
+      setCroquisFile(file);
     }
   };
 
-  const hasIncumplimiento = formData.condicionesAmbientales.some((c) => c.cumple === false);
-
-  const handleRequisitoChange = (index, cumple) => {
-    setFormData((prev) => {
-      const next = [...prev.conceptoTecnico.requisitosGenerales];
-      next[index] = { ...next[index], cumple };
-      return {
-        ...prev,
-        conceptoTecnico: { ...prev.conceptoTecnico, requisitosGenerales: next },
-      };
-    });
-  };
-
-  const handleViviendaNuevaAplica = (aplica) => {
-    setFormData((prev) => ({
-      ...prev,
-      conceptoTecnico: {
-        ...prev.conceptoTecnico,
-        viviendaNueva: { ...prev.conceptoTecnico.viviendaNueva, aplica },
-      },
-    }));
-  };
-
-  const handleViviendaNuevaCondicionChange = (index, valor) => {
-    setFormData((prev) => {
-      const next = [...prev.conceptoTecnico.viviendaNueva.condiciones];
-      next[index] = { ...next[index], valor };
-      return {
-        ...prev,
-        conceptoTecnico: {
-          ...prev.conceptoTecnico,
-          viviendaNueva: { ...prev.conceptoTecnico.viviendaNueva, condiciones: next },
-        },
-      };
-    });
-  };
-
-  const handleConstanciaChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      constanciaVisita: { ...prev.constanciaVisita, [field]: value },
-    }));
-  };
-
-  const handleProfesionalChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      constanciaVisita: {
-        ...prev.constanciaVisita,
-        profesional: { ...prev.constanciaVisita.profesional, [field]: value },
-      },
-    }));
+  const handleHuellaFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (isEdit && diagnosticoId) {
+      setHuellaError(null);
+      setHuellaUploading(true);
+      try {
+        const updated = await uploadService.uploadHuella(diagnosticoId, file);
+        setValue('constanciaVisita.huellaDigital', updated?.constanciaVisita?.huellaDigital || '', {
+          shouldDirty: true,
+        });
+      } catch (err) {
+        setHuellaError(err?.response?.data?.message || err.message || 'Error subiendo la huella.');
+      } finally {
+        setHuellaUploading(false);
+      }
+    } else {
+      setHuellaFile(file);
+    }
   };
 
   const openSignatureDialog = (target) => setSignatureDialog({ open: true, target });
@@ -460,205 +405,231 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
 
   const handleSignatureSave = (dataUrl) => {
     if (signatureDialog.target === 'titular') {
-      handleConstanciaChange('firmaTitular', dataUrl);
+      setValue('constanciaVisita.firmaTitular', dataUrl, { shouldDirty: true });
     } else if (signatureDialog.target === 'profesional') {
-      handleProfesionalChange('firma', dataUrl);
+      setValue('constanciaVisita.profesional.firma', dataUrl, { shouldDirty: true });
     }
     closeSignatureDialog();
   };
 
-  const handleHuellaChange = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (!diagnosticoId) {
-      setHuellaError('Guardá el diagnóstico antes de subir la huella.');
-      return;
-    }
-    setHuellaError(null);
-    setHuellaUploading(true);
-    try {
-      const updated = await uploadService.uploadHuella(diagnosticoId, file);
-      handleConstanciaChange('huellaDigital', updated?.constanciaVisita?.huellaDigital || '');
-    } catch (err) {
-      setHuellaError(err?.response?.data?.message || err.message || 'Error subiendo la huella.');
-    } finally {
-      setHuellaUploading(false);
-    }
-  };
-
-  const huellaSrc = (value) => {
-    if (!value) return '';
-    return value.startsWith('data:') ? value : resolveStaticUrl(value);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const onValid = (data) => {
+    onSubmit({ data, files: { croquis: croquisFile, huella: huellaFile } });
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+    <Box component="form" onSubmit={handleSubmit(onValid)} sx={{ mt: 3 }}>
       <Typography variant="h6" gutterBottom>
-        {initialData ? 'Editar Diagnóstico' : 'Nuevo Diagnóstico'}
+        {isEdit ? 'Editar Diagnóstico' : 'Nuevo Diagnóstico'}
       </Typography>
 
       <Grid container spacing={3}>
+        {/* Información del Documento */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">Información del Documento</Typography>
           <Divider sx={{ mb: 2 }} />
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth label="Fecha de Diligenciamiento" type="date"
-                InputLabelProps={{ shrink: true }}
-                value={formData.metadata.fechaDiligenciamiento}
-                onChange={(e) => handleSectionChange('metadata', 'fechaDiligenciamiento', e.target.value)}
-                required
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="metadata.fechaDiligenciamiento"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField
+                    {...field}
+                    fullWidth label="Fecha de Diligenciamiento" type="date"
+                    InputLabelProps={{ shrink: true }}
+                    error={!!fieldState.error}
+                    helperText={fieldState.error?.message}
+                  />
+                )}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth label="Consecutivo Hogar"
-                value={formData.metadata.consecutivoHogar}
-                InputProps={{ readOnly: true }}
-                helperText={
-                  formData.metadata.consecutivoHogar
-                    ? 'Asignado automáticamente'
-                    : 'Se asigna automáticamente al guardar'
-                }
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="metadata.fechaSuscripcion"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField
+                    {...field}
+                    fullWidth label="Fecha de Suscripción" type="date"
+                    InputLabelProps={{ shrink: true }}
+                    error={!!fieldState.error}
+                    helperText={fieldState.error?.message}
+                  />
+                )}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth label="Fecha de Suscripción" type="date"
-                InputLabelProps={{ shrink: true }}
-                value={formData.metadata.fechaSuscripcion}
-                onChange={(e) => handleSectionChange('metadata', 'fechaSuscripcion', e.target.value)}
-                required
-              />
-            </Grid>
+            {isEdit && consecutivoHogar && (
+              <Grid item xs={12}>
+                <Typography variant="caption" color="text.secondary">
+                  Consecutivo Hogar: <strong>{consecutivoHogar}</strong> (asignado automáticamente)
+                </Typography>
+              </Grid>
+            )}
           </Grid>
         </Grid>
 
+        {/* A. Datos del Titular del Hogar */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">A. Datos del Titular del Hogar</Typography>
           <Divider sx={{ mb: 2 }} />
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Nombre(s)"
-                value={formData.titular.nombre}
-                onChange={(e) => handleSectionChange('titular', 'nombre', e.target.value)}
-                required
+              <Controller
+                name="titular.nombre"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Nombre(s)"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Apellido(s)"
-                value={formData.titular.apellido}
-                onChange={(e) => handleSectionChange('titular', 'apellido', e.target.value)}
-                required
+              <Controller
+                name="titular.apellido"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Apellido(s)"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="No. Documento"
-                value={formData.titular.documento}
-                onChange={(e) => handleSectionChange('titular', 'documento', e.target.value)}
-                required
+              <Controller
+                name="titular.documento"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="No. Documento"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Cel. Contacto"
-                value={formData.titular.celular}
-                onChange={(e) => handleSectionChange('titular', 'celular', e.target.value)}
-                required
+              <Controller
+                name="titular.celular"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Cel. Contacto"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Departamento"
-                value={formData.titular.departamento}
-                onChange={(e) => handleSectionChange('titular', 'departamento', e.target.value)}
-                required
+              <Controller
+                name="titular.departamento"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Departamento"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Municipio"
-                value={formData.titular.municipio}
-                onChange={(e) => handleSectionChange('titular', 'municipio', e.target.value)}
-                required
+              <Controller
+                name="titular.municipio"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Municipio"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Vereda"
-                value={formData.titular.vereda}
-                onChange={(e) => handleSectionChange('titular', 'vereda', e.target.value)}
+              <Controller
+                name="titular.vereda"
+                control={control}
+                render={({ field }) => <TextField {...field} fullWidth label="Vereda" />}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth label="Otro"
-                value={formData.titular.otro}
-                onChange={(e) => handleSectionChange('titular', 'otro', e.target.value)}
+              <Controller
+                name="titular.otro"
+                control={control}
+                render={({ field }) => <TextField {...field} fullWidth label="Otro" />}
               />
             </Grid>
           </Grid>
         </Grid>
 
+        {/* Datos del Subsidio - Modalidad */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">Datos del Subsidio - Modalidad</Typography>
           <Divider sx={{ mb: 2 }} />
-          <TextField
-            select fullWidth label="Modalidad"
-            value={formData.modalidad.type}
-            onChange={(e) => handleSectionChange('modalidad', 'type', e.target.value)}
-            required
-          >
-            {MODALIDADES.map((m) => (
-              <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
-            ))}
-          </TextField>
+          <Controller
+            name="modalidad.type"
+            control={control}
+            rules={requiredRule}
+            render={({ field, fieldState }) => (
+              <TextField select fullWidth label="Modalidad"
+                {...field} value={field.value || ''}
+                error={!!fieldState.error} helperText={fieldState.error?.message}
+              >
+                {MODALIDADES.map((m) => (
+                  <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+                ))}
+              </TextField>
+            )}
+          />
         </Grid>
 
+        {/* B. Condición del Hogar */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">B. Condición del Hogar</Typography>
           <Divider sx={{ mb: 2 }} />
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={formData.actividadProductiva.tiene}
-                onChange={(e) => handleSectionChange('actividadProductiva', 'tiene', e.target.checked)}
+          <Controller
+            name="actividadProductiva.tiene"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={!!field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                  />
+                }
+                label="¿En la vivienda se desarrolla alguna actividad productiva?"
               />
-            }
-            label="¿En la vivienda se desarrolla alguna actividad productiva?"
+            )}
           />
 
-          {formData.actividadProductiva.tiene && (
+          {actividadTiene && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  select fullWidth label="Tipo de actividad"
-                  value={formData.actividadProductiva.tipo}
-                  onChange={(e) => handleSectionChange('actividadProductiva', 'tipo', e.target.value)}
-                  required
-                >
-                  {TIPOS_ACTIVIDAD.map((t) => (
-                    <MenuItem key={t} value={t}>{t}</MenuItem>
-                  ))}
-                </TextField>
+                <Controller
+                  name="actividadProductiva.tipo"
+                  control={control}
+                  rules={requiredRule}
+                  shouldUnregister
+                  render={({ field, fieldState }) => (
+                    <TextField select fullWidth label="Tipo de actividad"
+                      {...field} value={field.value || ''}
+                      error={!!fieldState.error} helperText={fieldState.error?.message}
+                    >
+                      {TIPOS_ACTIVIDAD.map((t) => (
+                        <MenuItem key={t} value={t}>{t}</MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth label="Describa (Otro)"
-                  value={formData.actividadProductiva.descripcion}
-                  onChange={(e) => handleSectionChange('actividadProductiva', 'descripcion', e.target.value)}
-                  required={formData.actividadProductiva.tipo === 'Otro'}
+                <Controller
+                  name="actividadProductiva.descripcion"
+                  control={control}
+                  rules={actividadTipo === 'Otro' ? requiredRule : undefined}
+                  shouldUnregister
+                  render={({ field, fieldState }) => (
+                    <TextField {...field} fullWidth label="Describa (Otro)"
+                      error={!!fieldState.error} helperText={fieldState.error?.message} />
+                  )}
                 />
               </Grid>
             </Grid>
@@ -666,101 +637,143 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
 
           <Grid container spacing={2} sx={{ mt: 2 }}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                select fullWidth label="Nivel educativo del Jefe de Hogar"
-                value={formData.nivelEducativo}
-                onChange={(e) => handleBaseChange('nivelEducativo', e.target.value)}
-                required
-              >
-                {NIVELES_EDUCATIVOS.map((n) => (
-                  <MenuItem key={n} value={n}>{n}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <TextField
-                fullWidth label="No. Personas en hogar" type="number"
-                inputProps={{ min: 1 }}
-                value={formData.numeroPersonas}
-                onChange={(e) => handleBaseChange('numeroPersonas', e.target.value)}
-                required
+              <Controller
+                name="nivelEducativo"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField select fullWidth label="Nivel educativo del Jefe de Hogar"
+                    {...field} value={field.value || ''}
+                    error={!!fieldState.error} helperText={fieldState.error?.message}
+                  >
+                    {NIVELES_EDUCATIVOS.map((n) => (
+                      <MenuItem key={n} value={n}>{n}</MenuItem>
+                    ))}
+                  </TextField>
+                )}
               />
             </Grid>
             <Grid item xs={6} sm={3}>
-              <TextField
-                fullWidth label="No. Hogares en vivienda" type="number"
-                inputProps={{ min: 1 }}
-                value={formData.numeroHogares}
-                onChange={(e) => handleBaseChange('numeroHogares', e.target.value)}
-                required
+              <Controller
+                name="numeroPersonas"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="No. Personas en hogar"
+                    type="number" inputProps={{ min: 1 }}
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Controller
+                name="numeroHogares"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="No. Hogares en vivienda"
+                    type="number" inputProps={{ min: 1 }}
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={6} sm={6}>
-              <TextField
-                fullWidth label="Habitaciones para dormir" type="number"
-                inputProps={{ min: 0 }}
-                value={formData.numeroHabitaciones}
-                onChange={(e) => handleBaseChange('numeroHabitaciones', e.target.value)}
-                required
+              <Controller
+                name="numeroHabitaciones"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Habitaciones para dormir"
+                    type="number" inputProps={{ min: 0 }}
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
             <Grid item xs={6} sm={6}>
-              <TextField
-                fullWidth label="Cuartos usados" type="number"
-                inputProps={{ min: 0 }}
-                value={formData.numeroCuartos}
-                onChange={(e) => handleBaseChange('numeroCuartos', e.target.value)}
-                required
+              <Controller
+                name="numeroCuartos"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Cuartos usados"
+                    type="number" inputProps={{ min: 0 }}
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
           </Grid>
         </Grid>
 
+        {/* C. Acreditación de la Tenencia del Predio */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">C. Acreditación de la Tenencia del Predio</Typography>
           <Divider sx={{ mb: 2 }} />
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={formData.tenenciaPredio.tipo === 'Otro' ? 6 : 12}>
-              <TextField
-                select fullWidth label="Tipo de acreditación"
-                value={formData.tenenciaPredio.tipo}
-                onChange={(e) => handleSectionChange('tenenciaPredio', 'tipo', e.target.value)}
-                required
-              >
-                {TIPOS_TENENCIA.map((t) => (
-                  <MenuItem key={t} value={t}>{t}</MenuItem>
-                ))}
-              </TextField>
+            <Grid item xs={12} sm={tenenciaTipo === 'Otro' ? 6 : 12}>
+              <Controller
+                name="tenenciaPredio.tipo"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField select fullWidth label="Tipo de acreditación"
+                    {...field} value={field.value || ''}
+                    error={!!fieldState.error} helperText={fieldState.error?.message}
+                  >
+                    {TIPOS_TENENCIA.map((t) => (
+                      <MenuItem key={t} value={t}>{t}</MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
             </Grid>
-            {formData.tenenciaPredio.tipo === 'Otro' && (
+            {tenenciaTipo === 'Otro' && (
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth label="Nombre y/o descripción (Otro)"
-                  value={formData.tenenciaPredio.otro}
-                  onChange={(e) => handleSectionChange('tenenciaPredio', 'otro', e.target.value)}
-                  required
+                <Controller
+                  name="tenenciaPredio.otro"
+                  control={control}
+                  rules={requiredRule}
+                  shouldUnregister
+                  render={({ field, fieldState }) => (
+                    <TextField {...field} fullWidth label="Nombre y/o descripción (Otro)"
+                      error={!!fieldState.error} helperText={fieldState.error?.message} />
+                  )}
                 />
               </Grid>
             )}
           </Grid>
         </Grid>
 
+        {/* D. Condiciones Ambientales */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">D. Condiciones Ambientales y Territoriales del Predio</Typography>
           <Divider sx={{ mb: 2 }} />
 
           <Paper variant="outlined" sx={{ p: 2 }}>
-            {formData.condicionesAmbientales.map((cond, index) => (
-              <Box key={cond.condicion} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: index < formData.condicionesAmbientales.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
-                <Typography variant="body2">{`${String.fromCharCode(97 + index)}) ${cond.condicion}`}</Typography>
-                <RadioGroup
-                  row
-                  value={cond.cumple ? 'cumple' : 'no_cumple'}
-                  onChange={(e) => handleCondicionChange(index, e.target.value === 'cumple')}
-                >
-                  <FormControlLabel value="cumple" control={<Radio size="small" />} label="Cumple" />
-                  <FormControlLabel value="no_cumple" control={<Radio size="small" />} label="No cumple" />
-                </RadioGroup>
+            {CONDICIONES_AMBIENTALES.map((condicionLabel, index) => (
+              <Box
+                key={condicionLabel}
+                sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  py: 1,
+                  borderBottom: index < CONDICIONES_AMBIENTALES.length - 1 ? '1px solid' : 'none',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography variant="body2">{`${String.fromCharCode(97 + index)}) ${condicionLabel}`}</Typography>
+                <Controller
+                  name={`condicionesAmbientales.${index}.cumple`}
+                  control={control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      row
+                      value={field.value === true ? 'cumple' : field.value === false ? 'no_cumple' : ''}
+                      onChange={(e) => field.onChange(e.target.value === 'cumple')}
+                    >
+                      <FormControlLabel value="cumple" control={<Radio size="small" />} label="Cumple" />
+                      <FormControlLabel value="no_cumple" control={<Radio size="small" />} label="No cumple" />
+                    </RadioGroup>
+                  )}
+                />
               </Box>
             ))}
           </Paper>
@@ -770,34 +783,51 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>
                 Si el predio "NO CUMPLE", indicar la causa:
               </Typography>
-              <FormGroup row>
-                {CAUSAS_NO_CUMPLE.map((causa) => (
-                  <FormControlLabel
-                    key={causa}
-                    sx={{ minWidth: '33%' }}
-                    control={
-                      <Checkbox
-                        checked={formData.causasNoCumple.causas.includes(causa)}
-                        onChange={() => toggleCausa(causa)}
+              <Controller
+                name="causasNoCumple.causas"
+                control={control}
+                render={({ field }) => (
+                  <FormGroup row>
+                    {CAUSAS_NO_CUMPLE.map((causa) => (
+                      <FormControlLabel
+                        key={causa}
+                        sx={{ minWidth: '33%' }}
+                        control={
+                          <Checkbox
+                            checked={(field.value || []).includes(causa)}
+                            onChange={() => {
+                              const current = field.value || [];
+                              const next = current.includes(causa)
+                                ? current.filter((c) => c !== causa)
+                                : [...current, causa];
+                              field.onChange(next);
+                            }}
+                          />
+                        }
+                        label={causa}
                       />
-                    }
-                    label={causa}
-                  />
-                ))}
-              </FormGroup>
-              {formData.causasNoCumple.causas.includes('Otro') && (
-                <TextField
-                  fullWidth label='Descripción causa "Otro"'
-                  sx={{ mt: 1 }}
-                  value={formData.causasNoCumple.otro}
-                  onChange={(e) => handleSectionChange('causasNoCumple', 'otro', e.target.value)}
-                  required
+                    ))}
+                  </FormGroup>
+                )}
+              />
+              {causasSeleccionadas.includes('Otro') && (
+                <Controller
+                  name="causasNoCumple.otro"
+                  control={control}
+                  rules={requiredRule}
+                  shouldUnregister
+                  render={({ field, fieldState }) => (
+                    <TextField {...field} fullWidth sx={{ mt: 1 }}
+                      label='Descripción causa "Otro"'
+                      error={!!fieldState.error} helperText={fieldState.error?.message} />
+                  )}
                 />
               )}
             </Box>
           )}
         </Grid>
 
+        {/* F. Servicios Públicos */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">F. Disponibilidad o Acceso a Servicios Públicos</Typography>
           <Divider sx={{ mb: 2 }} />
@@ -811,47 +841,62 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               <Typography variant="body2">
                 ¿El predio cuenta con posibilidad de abastecimiento de agua?
               </Typography>
-              <RadioGroup
-                row
-                value={
-                  formData.serviciosPublicos.abastecimientoAgua.cuenta === true
-                    ? 'si'
-                    : formData.serviciosPublicos.abastecimientoAgua.cuenta === false
-                    ? 'no'
-                    : ''
-                }
-                onChange={(e) => handleServicioChange('abastecimientoAgua', 'cuenta', e.target.value === 'si')}
-              >
-                <FormControlLabel value="si" control={<Radio size="small" />} label="SI" />
-                <FormControlLabel value="no" control={<Radio size="small" />} label="NO" />
-              </RadioGroup>
+              <Controller
+                name="serviciosPublicos.abastecimientoAgua.cuenta"
+                control={control}
+                render={({ field }) => (
+                  <RadioGroup
+                    row
+                    value={field.value === true ? 'si' : field.value === false ? 'no' : ''}
+                    onChange={(e) => field.onChange(e.target.value === 'si')}
+                  >
+                    <FormControlLabel value="si" control={<Radio size="small" />} label="SI" />
+                    <FormControlLabel value="no" control={<Radio size="small" />} label="NO" />
+                  </RadioGroup>
+                )}
+              />
             </Box>
 
             <Typography variant="body2" fontWeight="bold" sx={{ mt: 1, mb: 0.5 }}>
               Fuente de agua para consumo humano y doméstico:
             </Typography>
-            <FormGroup row>
-              {FUENTES_AGUA.map((fuente) => (
-                <FormControlLabel
-                  key={fuente}
-                  sx={{ minWidth: '25%' }}
-                  control={
-                    <Checkbox
-                      checked={formData.serviciosPublicos.abastecimientoAgua.fuentes.includes(fuente)}
-                      onChange={() => toggleFuenteAgua(fuente)}
+            <Controller
+              name="serviciosPublicos.abastecimientoAgua.fuentes"
+              control={control}
+              render={({ field }) => (
+                <FormGroup row>
+                  {FUENTES_AGUA.map((fuente) => (
+                    <FormControlLabel
+                      key={fuente}
+                      sx={{ minWidth: '25%' }}
+                      control={
+                        <Checkbox
+                          checked={(field.value || []).includes(fuente)}
+                          onChange={() => {
+                            const current = field.value || [];
+                            const next = current.includes(fuente)
+                              ? current.filter((f) => f !== fuente)
+                              : [...current, fuente];
+                            field.onChange(next);
+                          }}
+                        />
+                      }
+                      label={fuente}
                     />
-                  }
-                  label={fuente}
-                />
-              ))}
-            </FormGroup>
-            {formData.serviciosPublicos.abastecimientoAgua.fuentes.includes('Otro') && (
-              <TextField
-                fullWidth label="¿Cuál? (Otro)"
-                sx={{ mt: 1 }}
-                value={formData.serviciosPublicos.abastecimientoAgua.fuenteOtroDescripcion}
-                onChange={(e) => handleServicioChange('abastecimientoAgua', 'fuenteOtroDescripcion', e.target.value)}
-                required
+                  ))}
+                </FormGroup>
+              )}
+            />
+            {aguaFuentes.includes('Otro') && (
+              <Controller
+                name="serviciosPublicos.abastecimientoAgua.fuenteOtroDescripcion"
+                control={control}
+                rules={requiredRule}
+                shouldUnregister
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth sx={{ mt: 1 }} label="¿Cuál? (Otro)"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             )}
           </Paper>
@@ -863,28 +908,33 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             <Typography variant="body2" sx={{ mb: 0.5 }}>
               ¿Con qué tipo de servicio sanitario cuenta el hogar?
             </Typography>
-            <RadioGroup
-              row
-              value={formData.serviciosPublicos.aguasResiduales.tipo}
-              onChange={(e) => handleServicioChange('aguasResiduales', 'tipo', e.target.value)}
-            >
-              {TIPOS_AGUAS_RESIDUALES.map((tipo) => (
-                <FormControlLabel
-                  key={tipo}
-                  value={tipo}
-                  control={<Radio size="small" />}
-                  label={tipo}
-                  sx={{ minWidth: '33%' }}
-                />
-              ))}
-            </RadioGroup>
-            {formData.serviciosPublicos.aguasResiduales.tipo === 'Otro' && (
-              <TextField
-                fullWidth label="¿Cuál? (Otro)"
-                sx={{ mt: 1 }}
-                value={formData.serviciosPublicos.aguasResiduales.otroDescripcion}
-                onChange={(e) => handleServicioChange('aguasResiduales', 'otroDescripcion', e.target.value)}
-                required
+            <Controller
+              name="serviciosPublicos.aguasResiduales.tipo"
+              control={control}
+              render={({ field }) => (
+                <RadioGroup row {...field} value={field.value || ''}>
+                  {TIPOS_AGUAS_RESIDUALES.map((tipo) => (
+                    <FormControlLabel
+                      key={tipo}
+                      value={tipo}
+                      control={<Radio size="small" />}
+                      label={tipo}
+                      sx={{ minWidth: '33%' }}
+                    />
+                  ))}
+                </RadioGroup>
+              )}
+            />
+            {aguasResidualesTipo === 'Otro' && (
+              <Controller
+                name="serviciosPublicos.aguasResiduales.otroDescripcion"
+                control={control}
+                rules={requiredRule}
+                shouldUnregister
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth sx={{ mt: 1 }} label="¿Cuál? (Otro)"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             )}
           </Paper>
@@ -896,33 +946,39 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             <Typography variant="body2" sx={{ mb: 0.5 }}>
               Para las actividades del hogar la energía que utiliza es:
             </Typography>
-            <RadioGroup
-              row
-              value={formData.serviciosPublicos.energia.tipo}
-              onChange={(e) => handleServicioChange('energia', 'tipo', e.target.value)}
-            >
-              {TIPOS_ENERGIA.map((tipo) => (
-                <FormControlLabel
-                  key={tipo}
-                  value={tipo}
-                  control={<Radio size="small" />}
-                  label={tipo}
-                  sx={{ minWidth: '33%' }}
-                />
-              ))}
-            </RadioGroup>
-            {formData.serviciosPublicos.energia.tipo === 'Otro' && (
-              <TextField
-                fullWidth label="¿Cuál? (Otro)"
-                sx={{ mt: 1 }}
-                value={formData.serviciosPublicos.energia.otroDescripcion}
-                onChange={(e) => handleServicioChange('energia', 'otroDescripcion', e.target.value)}
-                required
+            <Controller
+              name="serviciosPublicos.energia.tipo"
+              control={control}
+              render={({ field }) => (
+                <RadioGroup row {...field} value={field.value || ''}>
+                  {TIPOS_ENERGIA.map((tipo) => (
+                    <FormControlLabel
+                      key={tipo}
+                      value={tipo}
+                      control={<Radio size="small" />}
+                      label={tipo}
+                      sx={{ minWidth: '33%' }}
+                    />
+                  ))}
+                </RadioGroup>
+              )}
+            />
+            {energiaTipo === 'Otro' && (
+              <Controller
+                name="serviciosPublicos.energia.otroDescripcion"
+                control={control}
+                rules={requiredRule}
+                shouldUnregister
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth sx={{ mt: 1 }} label="¿Cuál? (Otro)"
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             )}
           </Paper>
         </Grid>
 
+        {/* G. Levantamiento (Mano Alzada) */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">G. Levantamiento (Mano Alzada)</Typography>
           <Divider sx={{ mb: 2 }} />
@@ -932,20 +988,32 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                   Premisas de Dibujo
                 </Typography>
-                <FormGroup>
-                  {PREMISAS_DIBUJO.map((premisa, i) => (
-                    <FormControlLabel
-                      key={premisa}
-                      control={
-                        <Checkbox
-                          checked={formData.levantamiento.premisas.includes(premisa)}
-                          onChange={() => togglePremisa(premisa)}
+                <Controller
+                  name="levantamiento.premisas"
+                  control={control}
+                  render={({ field }) => (
+                    <FormGroup>
+                      {PREMISAS_DIBUJO.map((premisa, i) => (
+                        <FormControlLabel
+                          key={premisa}
+                          control={
+                            <Checkbox
+                              checked={(field.value || []).includes(premisa)}
+                              onChange={() => {
+                                const current = field.value || [];
+                                const next = current.includes(premisa)
+                                  ? current.filter((p) => p !== premisa)
+                                  : [...current, premisa];
+                                field.onChange(next);
+                              }}
+                            />
+                          }
+                          label={`${String.fromCharCode(97 + i)}) ${premisa}`}
                         />
-                      }
-                      label={`${String.fromCharCode(97 + i)}) ${premisa}`}
-                    />
-                  ))}
-                </FormGroup>
+                      ))}
+                    </FormGroup>
+                  )}
+                />
               </Paper>
             </Grid>
             <Grid item xs={12} md={6}>
@@ -953,27 +1021,31 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>
                   Características del Predio
                 </Typography>
-                <TextField
-                  fullWidth label="A) Área zona de intervención (m²)"
-                  type="number"
-                  inputProps={{ min: 0, step: '0.01' }}
-                  sx={{ mb: 2 }}
-                  value={formData.levantamiento.caracteristicas.area}
-                  onChange={(e) => handleCaracteristicaChange('area', e.target.value)}
+                <Controller
+                  name="levantamiento.caracteristicas.area"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField {...field} fullWidth sx={{ mb: 2 }}
+                      label="A) Área zona de intervención (m²)"
+                      type="number" inputProps={{ min: 0, step: '0.01' }} />
+                  )}
                 />
-                <TextField
-                  fullWidth label="B) Pendiente en zona de intervención (%)"
-                  type="number"
-                  inputProps={{ min: 0, max: 100, step: '0.01' }}
-                  sx={{ mb: 2 }}
-                  value={formData.levantamiento.caracteristicas.pendiente}
-                  onChange={(e) => handleCaracteristicaChange('pendiente', e.target.value)}
+                <Controller
+                  name="levantamiento.caracteristicas.pendiente"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField {...field} fullWidth sx={{ mb: 2 }}
+                      label="B) Pendiente en zona de intervención (%)"
+                      type="number" inputProps={{ min: 0, max: 100, step: '0.01' }} />
+                  )}
                 />
-                <TextField
-                  fullWidth label="Observaciones del levantamiento"
-                  multiline minRows={4}
-                  value={formData.levantamiento.caracteristicas.observaciones}
-                  onChange={(e) => handleCaracteristicaChange('observaciones', e.target.value)}
+                <Controller
+                  name="levantamiento.caracteristicas.observaciones"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField {...field} fullWidth multiline minRows={4}
+                      label="Observaciones del levantamiento" />
+                  )}
                 />
               </Paper>
             </Grid>
@@ -984,62 +1056,71 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                   Croquis / Levantamiento
                 </Typography>
 
-                {!diagnosticoId && (
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    Guarda primero el diagnóstico para poder subir el croquis.
-                  </Alert>
-                )}
-
                 {croquisError && (
                   <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCroquisError(null)}>
                     {croquisError}
                   </Alert>
                 )}
 
-                {formData.levantamiento.croquisUrl ? (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                {/* CASO: EDIT con croquis ya cargado → preview read-only */}
+                {isEdit && croquisUrl && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                     <Box
                       component="img"
-                      src={resolveStaticUrl(formData.levantamiento.croquisUrl)}
+                      src={resolveStaticUrl(croquisUrl)}
                       alt="Croquis del levantamiento"
                       sx={{
-                        maxWidth: '100%',
-                        maxHeight: 400,
-                        border: 1,
-                        borderColor: 'divider',
-                        borderRadius: 1,
+                        maxWidth: '100%', maxHeight: 400,
+                        border: 1, borderColor: 'divider', borderRadius: 1,
                       }}
                     />
-                    <Button
-                      variant="outlined"
-                      component="label"
-                      startIcon={croquisUploading ? <CircularProgress size={16} /> : <CloudUploadIcon />}
-                      disabled={!diagnosticoId || croquisUploading}
-                    >
-                      {croquisUploading ? 'Subiendo...' : 'Reemplazar croquis'}
-                      <input
-                        type="file" hidden accept="image/*"
-                        onChange={(e) => handleCroquisUpload(e.target.files?.[0])}
-                      />
-                    </Button>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, py: 3 }}>
-                    <Button
-                      variant="contained"
-                      component="label"
-                      startIcon={croquisUploading ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
-                      disabled={!diagnosticoId || croquisUploading}
-                    >
-                      {croquisUploading ? 'Subiendo...' : 'Subir croquis'}
-                      <input
-                        type="file" hidden accept="image/*"
-                        onChange={(e) => handleCroquisUpload(e.target.files?.[0])}
-                      />
-                    </Button>
                     <Typography variant="caption" color="text.secondary">
-                      La imagen se convertirá a WebP en el servidor para optimizar el tamaño.
+                      No modificable desde este formulario.
                     </Typography>
+                  </Box>
+                )}
+
+                {/* CASO: EDIT con croquis faltante O CREATE → permitir subir */}
+                {showCroquisUpload && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, py: 2 }}>
+                    {croquisFilePreview && (
+                      <Box
+                        component="img"
+                        src={croquisFilePreview}
+                        alt="Croquis seleccionado"
+                        sx={{
+                          maxWidth: '100%', maxHeight: 300,
+                          border: 1, borderColor: 'divider', borderRadius: 1,
+                          mb: 1,
+                        }}
+                      />
+                    )}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        variant={croquisFile ? 'outlined' : 'contained'}
+                        component="label"
+                        startIcon={croquisUploading ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+                        disabled={croquisUploading}
+                      >
+                        {croquisUploading ? 'Subiendo...' : (croquisFile || (isEdit && !croquisUrl)) ? 'Reemplazar croquis' : 'Seleccionar croquis'}
+                        <input type="file" hidden accept="image/*" onChange={handleCroquisFile} />
+                      </Button>
+                      {croquisFile && (
+                        <Button color="error" onClick={() => setCroquisFile(null)}>
+                          Quitar
+                        </Button>
+                      )}
+                    </Box>
+                    {!isEdit && (
+                      <Typography variant="caption" color="text.secondary">
+                        Se subirá al servidor cuando guardes el diagnóstico (se convierte a WebP).
+                      </Typography>
+                    )}
+                    {isEdit && !croquisUrl && (
+                      <Typography variant="caption" color="text.secondary">
+                        El croquis está faltante. Subilo ahora; después quedará bloqueado.
+                      </Typography>
+                    )}
                   </Box>
                 )}
               </Paper>
@@ -1047,12 +1128,17 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           </Grid>
         </Grid>
 
+        {/* Composición del Hogar - Miembros */}
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="subtitle1" fontWeight="bold">
               Composición del Hogar – Miembros
             </Typography>
-            <Button size="small" startIcon={<AddIcon />} onClick={addMiembro}>
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => miembrosArray.append({ ...MIEMBRO_VACIO })}
+            >
               Agregar miembro
             </Button>
           </Box>
@@ -1073,69 +1159,85 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {formData.miembros.length === 0 ? (
+                {miembrosArray.fields.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} align="center" sx={{ color: 'text.secondary' }}>
                       Sin miembros registrados. Usa "Agregar miembro" para añadir uno.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  formData.miembros.map((m, idx) => (
-                    <TableRow key={idx}>
+                  miembrosArray.fields.map((row, idx) => (
+                    <TableRow key={row.id}>
                       <TableCell>
-                        <TextField
-                          variant="standard" fullWidth
-                          value={m.apellidos}
-                          onChange={(e) => handleMiembroChange(idx, 'apellidos', e.target.value)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          variant="standard" fullWidth
-                          value={m.nombres}
-                          onChange={(e) => handleMiembroChange(idx, 'nombres', e.target.value)}
+                        <Controller
+                          name={`miembros.${idx}.apellidos`}
+                          control={control}
+                          render={({ field }) => <TextField variant="standard" fullWidth {...field} />}
                         />
                       </TableCell>
                       <TableCell>
-                        <TextField
-                          variant="standard" fullWidth
-                          value={m.documento}
-                          onChange={(e) => handleMiembroChange(idx, 'documento', e.target.value)}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Checkbox
-                          checked={m.alteracionMovilidad}
-                          onChange={(e) => handleMiembroChange(idx, 'alteracionMovilidad', e.target.checked)}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Checkbox
-                          checked={m.ciegoSordo}
-                          onChange={(e) => handleMiembroChange(idx, 'ciegoSordo', e.target.checked)}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Checkbox
-                          checked={m.altNeurologica}
-                          onChange={(e) => handleMiembroChange(idx, 'altNeurologica', e.target.checked)}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Checkbox
-                          checked={m.condEscaleras}
-                          onChange={(e) => handleMiembroChange(idx, 'condEscaleras', e.target.checked)}
+                        <Controller
+                          name={`miembros.${idx}.nombres`}
+                          control={control}
+                          render={({ field }) => <TextField variant="standard" fullWidth {...field} />}
                         />
                       </TableCell>
                       <TableCell>
-                        <TextField
-                          variant="standard" fullWidth
-                          value={m.descDiscapacidad}
-                          onChange={(e) => handleMiembroChange(idx, 'descDiscapacidad', e.target.value)}
+                        <Controller
+                          name={`miembros.${idx}.documento`}
+                          control={control}
+                          render={({ field }) => <TextField variant="standard" fullWidth {...field} />}
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton size="small" color="error" onClick={() => removeMiembro(idx)}>
+                        <Controller
+                          name={`miembros.${idx}.alteracionMovilidad`}
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox checked={!!field.value}
+                              onChange={(e) => field.onChange(e.target.checked)} />
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Controller
+                          name={`miembros.${idx}.ciegoSordo`}
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox checked={!!field.value}
+                              onChange={(e) => field.onChange(e.target.checked)} />
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Controller
+                          name={`miembros.${idx}.altNeurologica`}
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox checked={!!field.value}
+                              onChange={(e) => field.onChange(e.target.checked)} />
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Controller
+                          name={`miembros.${idx}.condEscaleras`}
+                          control={control}
+                          render={({ field }) => (
+                            <Checkbox checked={!!field.value}
+                              onChange={(e) => field.onChange(e.target.checked)} />
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Controller
+                          name={`miembros.${idx}.descDiscapacidad`}
+                          control={control}
+                          render={({ field }) => <TextField variant="standard" fullWidth {...field} />}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton size="small" color="error" onClick={() => miembrosArray.remove(idx)}>
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </TableCell>
@@ -1147,6 +1249,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           </TableContainer>
         </Grid>
 
+        {/* I. Constancia de Visita */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">I. Constancia de Visita</Typography>
           <Divider sx={{ mb: 2 }} />
@@ -1159,13 +1262,13 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 </Typography>
                 <TextField
                   fullWidth label="Nombre" size="small" sx={{ mb: 1 }}
-                  value={`${formData.titular.nombre || ''} ${formData.titular.apellido || ''}`.trim()}
+                  value={`${titularNombre || ''} ${titularApellido || ''}`.trim()}
                   InputProps={{ readOnly: true }}
                   helperText="Tomado de la sección A"
                 />
                 <TextField
                   fullWidth label="No. Documento" size="small" sx={{ mb: 2 }}
-                  value={formData.titular.documento || ''}
+                  value={titularDocumento || ''}
                   InputProps={{ readOnly: true }}
                 />
 
@@ -1173,33 +1276,27 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                   <Typography variant="caption" color="text.secondary">Firma del Titular</Typography>
                   <Box
                     sx={{
-                      border: '1px dashed',
-                      borderColor: 'divider',
-                      borderRadius: 1,
+                      border: '1px dashed', borderColor: 'divider', borderRadius: 1,
                       height: 110,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'background.paper',
-                      mt: 0.5,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: 'background.paper', mt: 0.5,
                     }}
                   >
-                    {formData.constanciaVisita.firmaTitular ? (
-                      <img
-                        src={formData.constanciaVisita.firmaTitular}
-                        alt="Firma del titular"
-                        style={{ maxHeight: '100%', maxWidth: '100%' }}
-                      />
+                    {firmaTitular ? (
+                      <img src={firmaTitular} alt="Firma del titular"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }} />
                     ) : (
                       <Typography variant="caption" color="text.secondary">Sin firma</Typography>
                     )}
                   </Box>
                   <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
                     <Button size="small" startIcon={<EditIcon />} onClick={() => openSignatureDialog('titular')}>
-                      {formData.constanciaVisita.firmaTitular ? 'Reemplazar' : 'Capturar Firma'}
+                      {firmaTitular ? 'Reemplazar' : 'Capturar Firma'}
                     </Button>
-                    {formData.constanciaVisita.firmaTitular && (
-                      <Button size="small" color="error" onClick={() => handleConstanciaChange('firmaTitular', '')}>
+                    {firmaTitular && (
+                      <Button size="small" color="error"
+                        onClick={() => setValue('constanciaVisita.firmaTitular', '', { shouldDirty: true })}
+                      >
                         Borrar
                       </Button>
                     )}
@@ -1210,53 +1307,62 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                   <Typography variant="caption" color="text.secondary">Huella Digital</Typography>
                   <Box
                     sx={{
-                      border: '1px dashed',
-                      borderColor: 'divider',
-                      borderRadius: 1,
+                      border: '1px dashed', borderColor: 'divider', borderRadius: 1,
                       height: 110,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'background.paper',
-                      mt: 0.5,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: 'background.paper', mt: 0.5,
                     }}
                   >
-                    {formData.constanciaVisita.huellaDigital ? (
-                      <img
-                        src={huellaSrc(formData.constanciaVisita.huellaDigital)}
-                        alt="Huella digital"
-                        style={{ maxHeight: '100%', maxWidth: '100%' }}
-                      />
+                    {huellaDigital ? (
+                      <img src={huellaSrc(huellaDigital)} alt="Huella digital"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }} />
+                    ) : huellaFilePreview ? (
+                      <img src={huellaFilePreview} alt="Huella seleccionada"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }} />
                     ) : (
                       <Typography variant="caption" color="text.secondary">Sin imagen</Typography>
                     )}
                   </Box>
-                  <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
-                    <Button
-                      size="small"
-                      startIcon={huellaUploading ? <CircularProgress size={16} /> : <FingerprintIcon />}
-                      component="label"
-                      disabled={!diagnosticoId || huellaUploading}
-                    >
-                      {formData.constanciaVisita.huellaDigital ? 'Reemplazar' : 'Subir Huella'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={handleHuellaChange}
-                      />
-                    </Button>
-                    {formData.constanciaVisita.huellaDigital && (
-                      <Button size="small" color="error" onClick={() => handleConstanciaChange('huellaDigital', '')}>
-                        Borrar
-                      </Button>
-                    )}
-                  </Box>
-                  {!diagnosticoId && (
+
+                  {/* EDIT con huella cargada → solo preview */}
+                  {isEdit && huellaDigital && (
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                      Guardá el diagnóstico para habilitar la subida.
+                      No modificable desde este formulario.
                     </Typography>
                   )}
+
+                  {/* CREATE o EDIT con huella faltante → permitir subir */}
+                  {showHuellaUpload && (
+                    <>
+                      <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <Button
+                          size="small"
+                          startIcon={huellaUploading ? <CircularProgress size={16} /> : <FingerprintIcon />}
+                          component="label"
+                          disabled={huellaUploading}
+                        >
+                          {huellaUploading ? 'Subiendo...' : huellaFile ? 'Reemplazar huella' : 'Seleccionar huella'}
+                          <input type="file" accept="image/*" hidden onChange={handleHuellaFile} />
+                        </Button>
+                        {huellaFile && (
+                          <Button size="small" color="error" onClick={() => setHuellaFile(null)}>
+                            Quitar
+                          </Button>
+                        )}
+                      </Box>
+                      {!isEdit && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                          Se subirá al servidor al guardar.
+                        </Typography>
+                      )}
+                      {isEdit && !huellaDigital && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                          La huella está faltante. Subila ahora; después quedará bloqueada.
+                        </Typography>
+                      )}
+                    </>
+                  )}
+
                   {huellaError && (
                     <Alert severity="error" sx={{ mt: 1 }} onClose={() => setHuellaError(null)}>
                       {huellaError}
@@ -1271,52 +1377,52 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
                   Profesional de Diagnóstico
                 </Typography>
-                <TextField
-                  fullWidth label="Nombre" size="small" sx={{ mb: 1 }}
-                  value={formData.constanciaVisita.profesional.nombre}
-                  onChange={(e) => handleProfesionalChange('nombre', e.target.value)}
+                <Controller
+                  name="constanciaVisita.profesional.nombre"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField {...field} fullWidth label="Nombre" size="small" sx={{ mb: 1 }} />
+                  )}
                 />
-                <TextField
-                  fullWidth label="No. Documento" size="small" sx={{ mb: 1 }}
-                  value={formData.constanciaVisita.profesional.documento}
-                  onChange={(e) => handleProfesionalChange('documento', e.target.value)}
+                <Controller
+                  name="constanciaVisita.profesional.documento"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField {...field} fullWidth label="No. Documento" size="small" sx={{ mb: 1 }} />
+                  )}
                 />
-                <TextField
-                  fullWidth label="No. Tarjeta Profesional" size="small" sx={{ mb: 2 }}
-                  value={formData.constanciaVisita.profesional.tarjetaProfesional}
-                  onChange={(e) => handleProfesionalChange('tarjetaProfesional', e.target.value)}
+                <Controller
+                  name="constanciaVisita.profesional.tarjetaProfesional"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField {...field} fullWidth label="No. Tarjeta Profesional" size="small" sx={{ mb: 2 }} />
+                  )}
                 />
 
                 <Typography variant="caption" color="text.secondary">Firma del Profesional</Typography>
                 <Box
                   sx={{
-                    border: '1px dashed',
-                    borderColor: 'divider',
-                    borderRadius: 1,
+                    border: '1px dashed', borderColor: 'divider', borderRadius: 1,
                     height: 110,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'background.paper',
-                    mt: 0.5,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: 'background.paper', mt: 0.5,
                   }}
                 >
-                  {formData.constanciaVisita.profesional.firma ? (
-                    <img
-                      src={formData.constanciaVisita.profesional.firma}
-                      alt="Firma del profesional"
-                      style={{ maxHeight: '100%', maxWidth: '100%' }}
-                    />
+                  {firmaProfesional ? (
+                    <img src={firmaProfesional} alt="Firma del profesional"
+                      style={{ maxHeight: '100%', maxWidth: '100%' }} />
                   ) : (
                     <Typography variant="caption" color="text.secondary">Sin firma</Typography>
                   )}
                 </Box>
                 <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
                   <Button size="small" startIcon={<EditIcon />} onClick={() => openSignatureDialog('profesional')}>
-                    {formData.constanciaVisita.profesional.firma ? 'Reemplazar' : 'Capturar Firma'}
+                    {firmaProfesional ? 'Reemplazar' : 'Capturar Firma'}
                   </Button>
-                  {formData.constanciaVisita.profesional.firma && (
-                    <Button size="small" color="error" onClick={() => handleProfesionalChange('firma', '')}>
+                  {firmaProfesional && (
+                    <Button size="small" color="error"
+                      onClick={() => setValue('constanciaVisita.profesional.firma', '', { shouldDirty: true })}
+                    >
                       Borrar
                     </Button>
                   )}
@@ -1325,19 +1431,24 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             </Grid>
 
             <Grid item xs={12} sm={8}>
-              <TextField
-                fullWidth label="Testigo (si aplica) - Nombre"
-                value={formData.constanciaVisita.testigo}
-                onChange={(e) => handleConstanciaChange('testigo', e.target.value)}
+              <Controller
+                name="constanciaVisita.testigo"
+                control={control}
+                render={({ field }) => (
+                  <TextField {...field} fullWidth label="Testigo (si aplica) - Nombre" />
+                )}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth label="Fecha de Visita" type="date"
-                InputLabelProps={{ shrink: true }}
-                value={formData.constanciaVisita.fechaVisita}
-                onChange={(e) => handleConstanciaChange('fechaVisita', e.target.value)}
-                required
+              <Controller
+                name="constanciaVisita.fechaVisita"
+                control={control}
+                rules={requiredRule}
+                render={({ field, fieldState }) => (
+                  <TextField {...field} fullWidth label="Fecha de Visita" type="date"
+                    InputLabelProps={{ shrink: true }}
+                    error={!!fieldState.error} helperText={fieldState.error?.message} />
+                )}
               />
             </Grid>
           </Grid>
@@ -1353,9 +1464,9 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             }
             initialDataUrl={
               signatureDialog.target === 'titular'
-                ? formData.constanciaVisita.firmaTitular
+                ? firmaTitular
                 : signatureDialog.target === 'profesional'
-                ? formData.constanciaVisita.profesional.firma
+                ? firmaProfesional
                 : ''
             }
             onCancel={closeSignatureDialog}
@@ -1363,6 +1474,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           />
         </Grid>
 
+        {/* J. Concepto Técnico */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">J. Concepto Técnico - Diagnóstico Integral</Typography>
           <Divider sx={{ mb: 2 }} />
@@ -1381,23 +1493,31 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {formData.conceptoTecnico.requisitosGenerales.map((req, index) => (
-                    <TableRow key={req.requisito}>
-                      <TableCell>{`${String.fromCharCode(97 + index)}) ${req.requisito}`}</TableCell>
-                      <TableCell align="center">
-                        <Radio
-                          size="small"
-                          checked={req.cumple === true}
-                          onChange={() => handleRequisitoChange(index, true)}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Radio
-                          size="small"
-                          checked={req.cumple === false}
-                          onChange={() => handleRequisitoChange(index, false)}
-                        />
-                      </TableCell>
+                  {REQUISITOS_GENERALES.map((requisitoLabel, index) => (
+                    <TableRow key={requisitoLabel}>
+                      <TableCell>{`${String.fromCharCode(97 + index)}) ${requisitoLabel}`}</TableCell>
+                      <Controller
+                        name={`conceptoTecnico.requisitosGenerales.${index}.cumple`}
+                        control={control}
+                        render={({ field }) => (
+                          <>
+                            <TableCell align="center">
+                              <Radio
+                                size="small"
+                                checked={field.value === true}
+                                onChange={() => field.onChange(true)}
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Radio
+                                size="small"
+                                checked={field.value === false}
+                                onChange={() => field.onChange(false)}
+                              />
+                            </TableCell>
+                          </>
+                        )}
+                      />
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1409,23 +1529,23 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               Validación Modalidad Vivienda Nueva
             </Typography>
-            <RadioGroup
-              row
-              value={
-                formData.conceptoTecnico.viviendaNueva.aplica === true
-                  ? 'aplica'
-                  : formData.conceptoTecnico.viviendaNueva.aplica === false
-                  ? 'no_aplica'
-                  : ''
-              }
-              onChange={(e) => handleViviendaNuevaAplica(e.target.value === 'aplica')}
-              sx={{ mb: 1 }}
-            >
-              <FormControlLabel value="aplica" control={<Radio size="small" />} label="APLICA" />
-              <FormControlLabel value="no_aplica" control={<Radio size="small" />} label="NO APLICA" />
-            </RadioGroup>
+            <Controller
+              name="conceptoTecnico.viviendaNueva.aplica"
+              control={control}
+              render={({ field }) => (
+                <RadioGroup
+                  row
+                  value={field.value === true ? 'aplica' : field.value === false ? 'no_aplica' : ''}
+                  onChange={(e) => field.onChange(e.target.value === 'aplica')}
+                  sx={{ mb: 1 }}
+                >
+                  <FormControlLabel value="aplica" control={<Radio size="small" />} label="APLICA" />
+                  <FormControlLabel value="no_aplica" control={<Radio size="small" />} label="NO APLICA" />
+                </RadioGroup>
+              )}
+            />
 
-            {formData.conceptoTecnico.viviendaNueva.aplica === true && (
+            {viviendaNuevaAplica === true && (
               <TableContainer>
                 <Table size="small">
                   <TableHead>
@@ -1436,23 +1556,31 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {formData.conceptoTecnico.viviendaNueva.condiciones.map((cond, index) => (
-                      <TableRow key={cond.condicion}>
-                        <TableCell>{`${String.fromCharCode(97 + index)}) ${cond.condicion}`}</TableCell>
-                        <TableCell align="center">
-                          <Radio
-                            size="small"
-                            checked={cond.valor === true}
-                            onChange={() => handleViviendaNuevaCondicionChange(index, true)}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <Radio
-                            size="small"
-                            checked={cond.valor === false}
-                            onChange={() => handleViviendaNuevaCondicionChange(index, false)}
-                          />
-                        </TableCell>
+                    {CONDICIONES_VIVIENDA_NUEVA.map((condicionLabel, index) => (
+                      <TableRow key={condicionLabel}>
+                        <TableCell>{`${String.fromCharCode(97 + index)}) ${condicionLabel}`}</TableCell>
+                        <Controller
+                          name={`conceptoTecnico.viviendaNueva.condiciones.${index}.valor`}
+                          control={control}
+                          render={({ field }) => (
+                            <>
+                              <TableCell align="center">
+                                <Radio
+                                  size="small"
+                                  checked={field.value === true}
+                                  onChange={() => field.onChange(true)}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Radio
+                                  size="small"
+                                  checked={field.value === false}
+                                  onChange={() => field.onChange(false)}
+                                />
+                              </TableCell>
+                            </>
+                          )}
+                        />
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1462,6 +1590,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           </Paper>
         </Grid>
 
+        {/* Botones */}
         <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
           <Button variant="outlined" onClick={onCancel}>Cancelar</Button>
           <Button variant="contained" type="submit" color="primary">Guardar Diagnóstico</Button>
