@@ -520,10 +520,13 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth label="Consecutivo Hogar"
-                placeholder="GPV-20260323-0002"
                 value={formData.metadata.consecutivoHogar}
-                onChange={(e) => handleSectionChange('metadata', 'consecutivoHogar', e.target.value)}
-                required
+                InputProps={{ readOnly: true }}
+                helperText={
+                  formData.metadata.consecutivoHogar
+                    ? 'Asignado automáticamente'
+                    : 'Se asigna automáticamente al guardar'
+                }
               />
             </Grid>
             <Grid item xs={12} sm={4}>

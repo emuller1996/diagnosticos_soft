@@ -1,5 +1,7 @@
 import PdfDocument from './PdfDocument';
 import { resolveStaticUrl } from '../apiClient';
+import logoColombia from '../../assets/logo-colombia.png';
+import logoVivienda from '../../assets/logo-vivienda.png';
 
 const TIPOS_ACTIVIDAD = ['Servicios', 'Comercio', 'Artesanía', 'Turismo', 'Agropecuaria', 'Otro'];
 const NIVELES_EDUCATIVOS = ['Primaria', 'Secundaria', 'Técnico', 'Universitario', 'Postgrado', 'Ninguno'];
@@ -62,19 +64,75 @@ const PREMISAS_DIBUJO = [
   'Cotas zona de implantación',
 ];
 
-const renderHeader = (doc, data) => {
-  doc.title('DIAGNÓSTICO INTEGRAL');
-  doc.subtitle('PROCESO: GESTIÓN A LA POLÍTICA DE VIVIENDA');
-  doc.subtitle('Versión: 4.0 | Fecha: 07/09/2023 | Código: GPV-F-73', { size: 7.5 });
-  doc.spacer(4);
+const HEADER_TOP = 8;
+const HEADER_HEIGHT = 38;
 
+const drawPageHeader = (doc, data, pageNum) => {
   const meta = data.metadata || {};
-  doc.fieldRow([
-    { label: 'FECHA DE DILIGENCIAMIENTO', value: meta.fechaDiligenciamiento },
-    { label: 'CONSECUTIVO HOGAR', value: meta.consecutivoHogar },
-    { label: 'FECHA DE SUSCRIPCIÓN', value: meta.fechaSuscripcion },
-  ]);
-  doc.spacer(3);
+  const x0 = doc.marginX;
+  const w = doc.contentWidth;
+
+  // "Hoja N" arriba a la derecha
+  doc.doc.setFont('helvetica', 'normal');
+  doc.doc.setFontSize(8);
+  doc.doc.setTextColor(100);
+  doc.doc.text(`Hoja ${pageNum}`, doc.pageWidth - doc.marginX, 6, { align: 'right' });
+  doc.doc.setTextColor(0);
+
+  // Recuadro del header
+  doc.doc.setDrawColor(180);
+  doc.doc.setLineWidth(0.2);
+  doc.doc.rect(x0, HEADER_TOP, w, HEADER_HEIGHT - HEADER_TOP);
+
+  // Logos
+  const logoW = 22;
+  const logoH = 18;
+  if (data._logoColombiaDataUrl) {
+    try {
+      doc.doc.addImage(data._logoColombiaDataUrl, 'PNG', x0 + 2, HEADER_TOP + 2, logoW, logoH);
+    } catch (err) {
+      console.warn('logo Colombia:', err);
+    }
+  }
+  if (data._logoViviendaDataUrl) {
+    try {
+      doc.doc.addImage(data._logoViviendaDataUrl, 'PNG', x0 + w - logoW - 2, HEADER_TOP + 2, logoW, logoH);
+    } catch (err) {
+      console.warn('logo Vivienda:', err);
+    }
+  }
+
+  // Título centrado
+  const cx = doc.pageWidth / 2;
+  doc.doc.setFont('helvetica', 'bold');
+  doc.doc.setFontSize(11);
+  doc.doc.text('DIAGNÓSTICO INTEGRAL', cx, HEADER_TOP + 5, { align: 'center' });
+  doc.doc.setFontSize(9);
+  doc.doc.text('PROCESO: GESTIÓN A LA POLÍTICA DE VIVIENDA', cx, HEADER_TOP + 9.5, { align: 'center' });
+  doc.doc.setFont('helvetica', 'normal');
+  doc.doc.setFontSize(7);
+  doc.doc.setTextColor(100);
+  doc.doc.text('Versión: 4.0 | Fecha: 07/09/2023 | Código: GPV-F-73', cx, HEADER_TOP + 13, { align: 'center' });
+  doc.doc.setTextColor(0);
+
+  // Metadata: 3 columnas (Fecha Diligenciamiento, Consecutivo, Fecha Suscripción)
+  const metaTop = HEADER_TOP + 18;
+  const metaX = x0 + logoW + 4;
+  const metaW = w - 2 * (logoW + 4);
+  const colW = metaW / 3;
+  const writeMeta = (label, value, fx) => {
+    doc.doc.setFont('helvetica', 'bold');
+    doc.doc.setFontSize(7);
+    doc.doc.text(label, fx, metaTop);
+    doc.doc.setFont('helvetica', 'normal');
+    doc.doc.setFontSize(9);
+    doc.doc.text(String(value ?? ''), fx, metaTop + 5);
+    doc.doc.setDrawColor(200);
+    doc.doc.line(fx, metaTop + 6, fx + colW - 3, metaTop + 6);
+  };
+  writeMeta('FECHA DE DILIGENCIAMIENTO', meta.fechaDiligenciamiento, metaX);
+  writeMeta('CONSECUTIVO HOGAR', meta.consecutivoHogar, metaX + colW);
+  writeMeta('FECHA DE SUSCRIPCIÓN', meta.fechaSuscripcion, metaX + colW * 2);
 };
 
 const renderTitular = (doc, data) => {
@@ -460,7 +518,6 @@ const renderConceptoTecnico = (doc, data) => {
 };
 
 const sections = [
-  renderHeader,
   renderTitular,
   renderModalidad,
   renderCondicionHogar,
@@ -508,12 +565,31 @@ const hydrateAssets = async (data) => {
     }
   }
 
+  try {
+    out._logoColombiaDataUrl = await fetchAsDataUrl(logoColombia);
+  } catch (err) {
+    console.warn('No se pudo cargar el logo Colombia para el PDF:', err);
+  }
+  try {
+    out._logoViviendaDataUrl = await fetchAsDataUrl(logoVivienda);
+  } catch (err) {
+    console.warn('No se pudo cargar el logo Vivienda para el PDF:', err);
+  }
+
   return out;
 };
 
 export const generateDiagnosticoPdf = (data) => {
-  const doc = new PdfDocument();
+  const doc = new PdfDocument({ headerSpace: 30 });
   sections.forEach((section) => section(doc, data));
+
+  // Estampar header en cada página después de tener todo el contenido
+  const total = doc.doc.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.doc.setPage(i);
+    drawPageHeader(doc, data, i);
+  }
+
   return doc;
 };
 
