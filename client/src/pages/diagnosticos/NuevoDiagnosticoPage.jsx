@@ -77,7 +77,7 @@ const NuevoDiagnosticoPage = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(LIST_PATH)}>
           Volver

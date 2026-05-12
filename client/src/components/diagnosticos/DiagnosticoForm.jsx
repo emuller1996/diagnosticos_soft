@@ -23,6 +23,8 @@ import {
   TableRow,
   CircularProgress,
   Alert,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -332,6 +334,9 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const isEdit = !!initialData?.id;
   const diagnosticoId = initialData?.id;
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const { control, handleSubmit, watch, setValue, reset } = useForm({
     defaultValues: buildInitialState(initialData),
   });
@@ -601,7 +606,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
         {isEdit ? "Editar Diagnóstico" : "Nuevo Diagnóstico"}
       </Typography>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, md: 3 }}>
         {/* Información del Documento */}
         <Grid item xs={12}>
           <Typography variant="subtitle1" fontWeight="bold">
@@ -905,7 +910,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 )}
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Controller
                 name="numeroPersonas"
                 control={control}
@@ -923,7 +928,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 )}
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Controller
                 name="numeroHogares"
                 control={control}
@@ -941,7 +946,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 )}
               />
             </Grid>
-            <Grid item xs={6} sm={6}>
+            <Grid item xs={6} sm={6} md={3}>
               <Controller
                 name="numeroHabitaciones"
                 control={control}
@@ -959,7 +964,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 )}
               />
             </Grid>
-            <Grid item xs={6} sm={6}>
+            <Grid item xs={6} sm={6} md={3}>
               <Controller
                 name="numeroCuartos"
                 control={control}
@@ -1040,7 +1045,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
             {CONDICIONES_AMBIENTALES.map((condicionLabel, index) => (
               <Box
                 key={condicionLabel}
@@ -1100,27 +1105,28 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 name="causasNoCumple.causas"
                 control={control}
                 render={({ field }) => (
-                  <FormGroup row>
+                  <Grid container spacing={0}>
                     {CAUSAS_NO_CUMPLE.map((causa) => (
-                      <FormControlLabel
-                        key={causa}
-                        sx={{ minWidth: "33%" }}
-                        control={
-                          <Checkbox
-                            checked={(field.value || []).includes(causa)}
-                            onChange={() => {
-                              const current = field.value || [];
-                              const next = current.includes(causa)
-                                ? current.filter((c) => c !== causa)
-                                : [...current, causa];
-                              field.onChange(next);
-                            }}
-                          />
-                        }
-                        label={causa}
-                      />
+                      <Grid item xs={12} sm={6} md={4} key={causa}>
+                        <FormControlLabel
+                          sx={{ width: '100%' }}
+                          control={
+                            <Checkbox
+                              checked={(field.value || []).includes(causa)}
+                              onChange={() => {
+                                const current = field.value || [];
+                                const next = current.includes(causa)
+                                  ? current.filter((c) => c !== causa)
+                                  : [...current, causa];
+                                field.onChange(next);
+                              }}
+                            />
+                          }
+                          label={causa}
+                        />
+                      </Grid>
                     ))}
-                  </FormGroup>
+                  </Grid>
                 )}
               />
               {causasSeleccionadas.includes("Otro") && (
@@ -1152,7 +1158,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
-          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               Abastecimiento de Agua
             </Typography>
@@ -1209,27 +1215,28 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               name="serviciosPublicos.abastecimientoAgua.fuentes"
               control={control}
               render={({ field }) => (
-                <FormGroup row>
+                <Grid container spacing={0}>
                   {FUENTES_AGUA.map((fuente) => (
-                    <FormControlLabel
-                      key={fuente}
-                      sx={{ minWidth: "25%" }}
-                      control={
-                        <Checkbox
-                          checked={(field.value || []).includes(fuente)}
-                          onChange={() => {
-                            const current = field.value || [];
-                            const next = current.includes(fuente)
-                              ? current.filter((f) => f !== fuente)
-                              : [...current, fuente];
-                            field.onChange(next);
-                          }}
-                        />
-                      }
-                      label={fuente}
-                    />
+                    <Grid item xs={12} sm={6} md={3} key={fuente}>
+                      <FormControlLabel
+                        sx={{ width: '100%' }}
+                        control={
+                          <Checkbox
+                            checked={(field.value || []).includes(fuente)}
+                            onChange={() => {
+                              const current = field.value || [];
+                              const next = current.includes(fuente)
+                                ? current.filter((f) => f !== fuente)
+                                : [...current, fuente];
+                              field.onChange(next);
+                            }}
+                          />
+                        }
+                        label={fuente}
+                      />
+                    </Grid>
                   ))}
-                </FormGroup>
+                </Grid>
               )}
             />
             {aguaFuentes.includes("Otro") && (
@@ -1252,7 +1259,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             )}
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               Tratamiento de Aguas Residuales
             </Typography>
@@ -1263,14 +1270,14 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               name="serviciosPublicos.aguasResiduales.tipo"
               control={control}
               render={({ field }) => (
-                <RadioGroup row {...field} value={field.value || ""}>
+                <RadioGroup row {...field} value={field.value || ""} sx={{ flexWrap: 'wrap' }}>
                   {TIPOS_AGUAS_RESIDUALES.map((tipo) => (
                     <FormControlLabel
                       key={tipo}
                       value={tipo}
                       control={<Radio size="small" />}
                       label={tipo}
-                      sx={{ minWidth: "33%" }}
+                      sx={{ minWidth: { xs: '100%', sm: '50%', md: '33%' }, mr: 0 }}
                     />
                   ))}
                 </RadioGroup>
@@ -1296,7 +1303,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             )}
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               Disponibilidad o Acceso a Energía
             </Typography>
@@ -1307,14 +1314,14 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               name="serviciosPublicos.energia.tipo"
               control={control}
               render={({ field }) => (
-                <RadioGroup row {...field} value={field.value || ""}>
+                <RadioGroup row {...field} value={field.value || ""} sx={{ flexWrap: 'wrap' }}>
                   {TIPOS_ENERGIA.map((tipo) => (
                     <FormControlLabel
                       key={tipo}
                       value={tipo}
                       control={<Radio size="small" />}
                       label={tipo}
-                      sx={{ minWidth: "33%" }}
+                      sx={{ minWidth: { xs: '100%', sm: '50%', md: '33%' }, mr: 0 }}
                     />
                   ))}
                 </RadioGroup>
@@ -1349,7 +1356,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           <Divider sx={{ mb: 2 }} />
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
+              <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, height: "100%" }}>
                 <Typography
                   variant="subtitle2"
                   fontWeight="bold"
@@ -1386,7 +1393,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               </Paper>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
+              <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, height: "100%" }}>
                 <Typography
                   variant="subtitle2"
                   fontWeight="bold"
@@ -1439,7 +1446,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             </Grid>
 
             <Grid item xs={12}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
+              <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
                 <Typography
                   variant="subtitle2"
                   fontWeight="bold"
@@ -1474,7 +1481,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                       alt="Croquis del levantamiento"
                       sx={{
                         maxWidth: "100%",
-                        maxHeight: 400,
+                        maxHeight: { xs: 240, sm: 320, md: 400 },
                         border: 1,
                         borderColor: "divider",
                         borderRadius: 1,
@@ -1504,7 +1511,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                         alt="Croquis seleccionado"
                         sx={{
                           maxWidth: "100%",
-                          maxHeight: 300,
+                          maxHeight: { xs: 220, sm: 260, md: 300 },
                           border: 1,
                           borderColor: "divider",
                           borderRadius: 1,
@@ -1524,6 +1531,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                           )
                         }
                         disabled={croquisUploading}
+                        sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                       >
                         {croquisUploading
                           ? "Subiendo..."
@@ -1581,11 +1589,124 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               size="small"
               startIcon={<AddIcon />}
               onClick={() => miembrosArray.append({ ...MIEMBRO_VACIO })}
+              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
             >
               Agregar miembro
             </Button>
           </Box>
           <Divider sx={{ mb: 2 }} />
+          {isMobile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {miembrosArray.fields.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                  Sin miembros registrados. Usá "Agregar miembro" para añadir uno.
+                </Typography>
+              )}
+              {miembrosArray.fields.map((row, idx) => (
+                <Paper key={row.id} variant="outlined" sx={{ p: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      Miembro {idx + 1}
+                    </Typography>
+                    <IconButton
+                      size="medium"
+                      color="error"
+                      onClick={() => miembrosArray.remove(idx)}
+                      sx={{ minHeight: 44 }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                  <Controller
+                    name={`miembros.${idx}.apellidos`}
+                    control={control}
+                    render={({ field }) => (
+                      <TextField {...field} fullWidth size="small" label="Apellidos" sx={{ mb: 1 }} />
+                    )}
+                  />
+                  <Controller
+                    name={`miembros.${idx}.nombres`}
+                    control={control}
+                    render={({ field }) => (
+                      <TextField {...field} fullWidth size="small" label="Nombres" sx={{ mb: 1 }} />
+                    )}
+                  />
+                  <Controller
+                    name={`miembros.${idx}.documento`}
+                    control={control}
+                    render={({ field }) => (
+                      <TextField {...field} fullWidth size="small" label="Documento" sx={{ mb: 1 }} />
+                    )}
+                  />
+                  <FormGroup>
+                    <Controller
+                      name={`miembros.${idx}.alteracionMovilidad`}
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />
+                          }
+                          label="Alteración de movilidad"
+                        />
+                      )}
+                    />
+                    <Controller
+                      name={`miembros.${idx}.ciegoSordo`}
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />
+                          }
+                          label="Ciego / Sordo"
+                        />
+                      )}
+                    />
+                    <Controller
+                      name={`miembros.${idx}.altNeurologica`}
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />
+                          }
+                          label="Alteración neurológica"
+                        />
+                      )}
+                    />
+                    <Controller
+                      name={`miembros.${idx}.condEscaleras`}
+                      control={control}
+                      render={({ field }) => (
+                        <FormControlLabel
+                          control={
+                            <Checkbox checked={!!field.value} onChange={(e) => field.onChange(e.target.checked)} />
+                          }
+                          label="Condición para escaleras"
+                        />
+                      )}
+                    />
+                  </FormGroup>
+                  <Controller
+                    name={`miembros.${idx}.descDiscapacidad`}
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        size="small"
+                        label="Descripción de discapacidad"
+                        multiline
+                        minRows={2}
+                        sx={{ mt: 1 }}
+                      />
+                    )}
+                  />
+                </Paper>
+              ))}
+            </Box>
+          ) : (
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
@@ -1747,6 +1868,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               </TableBody>
             </Table>
           </TableContainer>
+          )}
         </Grid>
 
         {/* I. Constancia de Visita */}
@@ -1758,7 +1880,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
 
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
+              <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, height: "100%" }}>
                 <Typography
                   variant="subtitle2"
                   fontWeight="bold"
@@ -1813,11 +1935,12 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                       </Typography>
                     )}
                   </Box>
-                  <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+                  <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: 'wrap' }}>
                     <Button
                       size="small"
                       startIcon={<EditIcon />}
                       onClick={() => openSignatureDialog("titular")}
+                      sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                     >
                       {firmaTitular ? "Reemplazar" : "Capturar Firma"}
                     </Button>
@@ -1830,6 +1953,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                             shouldDirty: true,
                           })
                         }
+                        sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                       >
                         Borrar
                       </Button>
@@ -1906,6 +2030,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                           }
                           component="label"
                           disabled={huellaUploading}
+                          sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                         >
                           {huellaUploading
                             ? "Subiendo..."
@@ -1965,7 +2090,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
+              <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, height: "100%" }}>
                 <Typography
                   variant="subtitle2"
                   fontWeight="bold"
@@ -2041,11 +2166,12 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                     </Typography>
                   )}
                 </Box>
-                <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+                <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: 'wrap' }}>
                   <Button
                     size="small"
                     startIcon={<EditIcon />}
                     onClick={() => openSignatureDialog("profesional")}
+                    sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                   >
                     {firmaProfesional ? "Reemplazar" : "Capturar Firma"}
                   </Button>
@@ -2058,6 +2184,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                           shouldDirty: true,
                         })
                       }
+                      sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                     >
                       Borrar
                     </Button>
@@ -2127,10 +2254,35 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
-          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               Validación Requisitos Generales
             </Typography>
+            {isMobile ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {REQUISITOS_GENERALES.map((requisitoLabel, index) => (
+                  <Paper key={requisitoLabel} variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      {`${String.fromCharCode(97 + index)}) ${requisitoLabel}`}
+                    </Typography>
+                    <Controller
+                      name={`conceptoTecnico.requisitosGenerales.${index}.cumple`}
+                      control={control}
+                      render={({ field }) => (
+                        <RadioGroup
+                          row
+                          value={field.value === true ? 'cumple' : field.value === false ? 'no_cumple' : ''}
+                          onChange={(e) => field.onChange(e.target.value === 'cumple')}
+                        >
+                          <FormControlLabel value="cumple" control={<Radio size="small" />} label="Cumple" />
+                          <FormControlLabel value="no_cumple" control={<Radio size="small" />} label="No cumple" />
+                        </RadioGroup>
+                      )}
+                    />
+                  </Paper>
+                ))}
+              </Box>
+            ) : (
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -2177,9 +2329,10 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 </TableBody>
               </Table>
             </TableContainer>
+            )}
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               Validación Modalidad Vivienda Nueva
             </Typography>
@@ -2213,7 +2366,31 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               )}
             />
 
-            {viviendaNuevaAplica === true && (
+            {viviendaNuevaAplica === true && (isMobile ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {CONDICIONES_VIVIENDA_NUEVA.map((condicionLabel, index) => (
+                  <Paper key={condicionLabel} variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      {`${String.fromCharCode(97 + index)}) ${condicionLabel}`}
+                    </Typography>
+                    <Controller
+                      name={`conceptoTecnico.viviendaNueva.condiciones.${index}.valor`}
+                      control={control}
+                      render={({ field }) => (
+                        <RadioGroup
+                          row
+                          value={field.value === true ? 'si' : field.value === false ? 'no' : ''}
+                          onChange={(e) => field.onChange(e.target.value === 'si')}
+                        >
+                          <FormControlLabel value="si" control={<Radio size="small" />} label="SI" />
+                          <FormControlLabel value="no" control={<Radio size="small" />} label="NO" />
+                        </RadioGroup>
+                      )}
+                    />
+                  </Paper>
+                ))}
+              </Box>
+            ) : (
               <TableContainer>
                 <Table size="small">
                   <TableHead>
@@ -2260,7 +2437,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                   </TableBody>
                 </Table>
               </TableContainer>
-            )}
+            ))}
           </Paper>
         </Grid>
 
@@ -2283,6 +2460,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 anexoUploading ? <CircularProgress size={16} /> : <AddIcon />
               }
               disabled={anexoUploading}
+              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
             >
               {anexoUploading ? "Subiendo..." : "Agregar Foto"}
               <input
@@ -2322,7 +2500,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               const url = watch(`anexoFotografico.fotos.${idx}.url`);
               return (
                 <Grid item xs={12} md={12} key={row.id}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
                     <Box
                       sx={{
                         display: "flex",
@@ -2349,7 +2527,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                       alt={`Fotografía ${idx + 1}`}
                       sx={{
                         width: "100%",
-                        maxHeight: 280,
+                        maxHeight: { xs: 200, sm: 240, md: 280 },
                         objectFit: "contain",
                         border: 1,
                         borderColor: "divider",
@@ -2383,7 +2561,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                 <Paper
                   variant="outlined"
                   sx={{
-                    p: 2,
+                    p: { xs: 1.5, sm: 2 },
                     borderStyle: "dashed",
                     borderColor: "warning.light",
                   }}
@@ -2413,7 +2591,7 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
                     alt={`Foto local ${idx + 1}`}
                     sx={{
                       width: "100%",
-                      maxHeight: 280,
+                      maxHeight: { xs: 200, sm: 240, md: 280 },
                       objectFit: "contain",
                       border: 1,
                       borderColor: "divider",
@@ -2449,14 +2627,35 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
         {/* Botones */}
       </Grid>
       <Box
-        item
-        xs={12}
-        sx={{ display: "flex", justifyContent: "center", gap: 2, mt: 3 }}
+        sx={{
+          display: "flex",
+          justifyContent: { xs: "stretch", md: "center" },
+          gap: 2,
+          mt: 3,
+          position: { xs: "sticky", md: "static" },
+          bottom: { xs: 0, md: "auto" },
+          zIndex: { xs: 10, md: "auto" },
+          backgroundColor: "background.paper",
+          borderTop: { xs: 1, md: 0 },
+          borderColor: "divider",
+          py: { xs: 1.5, md: 0 },
+          mx: { xs: -2, md: 0 },
+          px: { xs: 2, md: 0 },
+        }}
       >
-        <Button variant="outlined" onClick={onCancel}>
+        <Button
+          variant="outlined"
+          onClick={onCancel}
+          sx={{ minHeight: { xs: 44, md: 36 }, flex: { xs: 1, md: '0 0 auto' } }}
+        >
           Cancelar
         </Button>
-        <Button variant="contained" type="submit" color="primary">
+        <Button
+          variant="contained"
+          type="submit"
+          color="primary"
+          sx={{ minHeight: { xs: 44, md: 36 }, flex: { xs: 2, md: '0 0 auto' } }}
+        >
           Guardar Diagnóstico
         </Button>
       </Box>
