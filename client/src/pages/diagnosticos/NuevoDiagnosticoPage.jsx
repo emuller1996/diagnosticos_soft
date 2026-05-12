@@ -42,6 +42,16 @@ const NuevoDiagnosticoPage = () => {
           uploadErrors.push(`huella: ${e?.response?.data?.message || e.message}`);
         }
       }
+      if (id && Array.isArray(files?.anexoFotos) && files.anexoFotos.length) {
+        for (let i = 0; i < files.anexoFotos.length; i++) {
+          const { file, observaciones } = files.anexoFotos[i];
+          try {
+            await uploadService.uploadAnexoFoto(id, file, observaciones || '');
+          } catch (e) {
+            uploadErrors.push(`anexo foto ${i + 1}: ${e?.response?.data?.message || e.message}`);
+          }
+        }
+      }
       if (uploadErrors.length) {
         navigate(LIST_PATH, {
           state: {
