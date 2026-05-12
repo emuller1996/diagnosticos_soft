@@ -517,6 +517,105 @@ const renderConceptoTecnico = (doc, data) => {
   }
 };
 
+const renderAnexoFotografico = (doc, data) => {
+  const fotos = data?.anexoFotografico?.fotos || [];
+  if (!fotos.length) return;
+
+  const dataUrls = data._anexoFotosDataUrls || [];
+  const titular = data.titular || {};
+
+  doc.sectionHeader('ANEXO 01 - REGISTRO FOTOGRÁFICO');
+
+  // Dos columnas: DATOS TITULAR | DATOS DEL PREDIO
+  doc.fieldRow([
+    { label: 'NOMBRE(S)', value: titular.nombre },
+    { label: 'DEPARTAMENTO', value: titular.departamento },
+  ]);
+  doc.fieldRow([
+    { label: 'APELLIDO(S)', value: titular.apellido },
+    { label: 'MUNICIPIO', value: titular.municipio },
+  ]);
+  doc.fieldRow([
+    { label: 'NO. DOCUMENTO', value: titular.documento },
+    { label: 'VEREDA', value: titular.vereda },
+  ]);
+  doc.fieldRow([
+    { label: 'CEL. CONTACTO', value: titular.celular },
+    { label: '', value: '' },
+  ]);
+  doc.spacer(3);
+
+  // Layout de fotos: 2 por fila
+  const gap = 4;
+  const colW = (doc.contentWidth - gap) / 2;
+  const imgH = 55; // altura del área de imagen
+  const headerBarH = 6;
+  const obsBoxH = 16;
+  const blockH = headerBarH + imgH + obsBoxH + 4; // alto total de cada foto
+
+  for (let i = 0; i < fotos.length; i += 2) {
+    doc.ensureSpace(blockH);
+    const rowY = doc.cursorY;
+
+    for (let col = 0; col < 2; col++) {
+      const idx = i + col;
+      if (idx >= fotos.length) break;
+      const foto = fotos[idx];
+      const dataUrl = dataUrls[idx];
+      const x = doc.marginX + col * (colW + gap);
+
+      // Header "FOTOGRAFÍA N"
+      doc.doc.setFillColor(...doc.config.headerFill);
+      doc.doc.rect(x, rowY, colW, headerBarH, 'F');
+      doc.doc.setTextColor(...doc.config.headerText);
+      doc.doc.setFont('helvetica', 'bold');
+      doc.doc.setFontSize(8);
+      doc.doc.text(`FOTOGRAFÍA ${idx + 1}`, x + 2, rowY + 4.2);
+      doc.doc.setTextColor(0);
+
+      // Imagen
+      const imgY = rowY + headerBarH;
+      doc.doc.setDrawColor(180);
+      doc.doc.setLineWidth(0.2);
+      doc.doc.rect(x, imgY, colW, imgH);
+
+      if (dataUrl) {
+        try {
+          const props = doc.doc.getImageProperties(dataUrl);
+          const aspect = props.width / props.height;
+          let drawW = colW - 2;
+          let drawH = drawW / aspect;
+          if (drawH > imgH - 2) {
+            drawH = imgH - 2;
+            drawW = drawH * aspect;
+          }
+          const dx = x + (colW - drawW) / 2;
+          const dy = imgY + (imgH - drawH) / 2;
+          doc.doc.addImage(dataUrl, 'WEBP', dx, dy, drawW, drawH);
+        } catch (err) {
+          // En caso de error, queda el recuadro vacío.
+          console.warn('No se pudo embeber la foto en el PDF:', err);
+        }
+      }
+
+      // Recuadro de observaciones
+      const obsY = imgY + imgH;
+      doc.doc.setFont('helvetica', 'bold');
+      doc.doc.setFontSize(7);
+      doc.doc.text('OBSERVACIONES:', x + 1, obsY + 3);
+      doc.doc.setDrawColor(180);
+      doc.doc.rect(x, obsY, colW, obsBoxH);
+      doc.doc.setFont('helvetica', 'normal');
+      doc.doc.setFontSize(8);
+      const obsText = String(foto?.observaciones || '');
+      const wrapped = doc.doc.splitTextToSize(obsText, colW - 2);
+      doc.doc.text(wrapped, x + 1, obsY + 7);
+    }
+
+    doc.cursorY = rowY + blockH;
+  }
+};
+
 const sections = [
   renderTitular,
   renderModalidad,
@@ -528,6 +627,7 @@ const sections = [
   renderMiembros,
   renderConstanciaVisita,
   renderConceptoTecnico,
+  renderAnexoFotografico,
 ];
 
 const fetchAsDataUrl = async (url) => {
@@ -574,6 +674,23 @@ const hydrateAssets = async (data) => {
     out._logoViviendaDataUrl = await fetchAsDataUrl(logoVivienda);
   } catch (err) {
     console.warn('No se pudo cargar el logo Vivienda para el PDF:', err);
+  }
+
+  const anexoFotos = data?.anexoFotografico?.fotos || [];
+  if (anexoFotos.length) {
+    out._anexoFotosDataUrls = await Promise.all(
+      anexoFotos.map(async (foto) => {
+        const url = foto?.url;
+        if (!url) return null;
+        if (url.startsWith('data:')) return url;
+        try {
+          return await fetchAsDataUrl(resolveStaticUrl(url));
+        } catch (err) {
+          console.warn('No se pudo cargar una foto del anexo para el PDF:', err);
+          return null;
+        }
+      })
+    );
   }
 
   return out;

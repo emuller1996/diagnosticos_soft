@@ -78,7 +78,7 @@ const DiagnosticosPage = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, pb: { xs: 10, md: 4 } }}>
       <Typography variant="h5" sx={{ mb: 2 }} fontWeight="bold">
         Gestión de Diagnósticos
       </Typography>

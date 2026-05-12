@@ -15,5 +15,7 @@ router.delete('/:id', diagnosticoController.deleteDiagnostico);
 router.patch('/:id/inactivate', diagnosticoController.inactivateDiagnostico);
 router.post('/:id/croquis', upload.single('croquis'), diagnosticoController.uploadCroquis);
 router.post('/:id/huella', upload.single('huella'), diagnosticoController.uploadHuella);
+router.post('/:id/anexo-foto', upload.single('file'), diagnosticoController.uploadAnexoFoto);
+router.delete('/:id/anexo-foto/:fotoIndex', diagnosticoController.deleteAnexoFoto);
 
 export default router;
