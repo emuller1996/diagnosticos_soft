@@ -32,6 +32,8 @@ import {
   CloudUpload as CloudUploadIcon,
   Edit as EditIcon,
   Fingerprint as FingerprintIcon,
+  MyLocation as MyLocationIcon,
+  Map as MapIcon,
 } from "@mui/icons-material";
 import { uploadService } from "../../services/uploadService";
 import { resolveStaticUrl } from "../../services/apiClient";
@@ -222,6 +224,7 @@ const buildInitialState = (initialData) => {
       },
     },
     anexoFotografico: { fotos: [] },
+    ubicacionGps: { latitud: "", longitud: "" },
   };
 
   if (!initialData) return defaults;
@@ -320,6 +323,10 @@ const buildInitialState = (initialData) => {
           }))
         : [],
     },
+    ubicacionGps: {
+      ...defaults.ubicacionGps,
+      ...(initialData.ubicacionGps || {}),
+    },
   };
 };
 
@@ -361,6 +368,10 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const [anexoUploading, setAnexoUploading] = useState(false);
   const [anexoError, setAnexoError] = useState(null);
 
+  // Geolocation API state
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState(null);
+
   // Estado de uploads en EDIT (cuando una imagen está faltante y se sube ahí mismo)
   const [croquisUploading, setCroquisUploading] = useState(false);
   const [croquisError, setCroquisError] = useState(null);
@@ -391,6 +402,46 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
   const huellaDigital = watch("constanciaVisita.huellaDigital");
   const consecutivoHogar = watch("metadata.consecutivoHogar");
   const viviendaNuevaAplica = watch("conceptoTecnico.viviendaNueva.aplica");
+  const gpsLat = watch("ubicacionGps.latitud");
+  const gpsLng = watch("ubicacionGps.longitud");
+
+  const gpsLink = useMemo(() => {
+    const lat = parseFloat(gpsLat);
+    const lng = parseFloat(gpsLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return "";
+    return `https://www.google.com/maps?q=${lat},${lng}`;
+  }, [gpsLat, gpsLng]);
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsError("Este navegador no soporta geolocalización.");
+      return;
+    }
+    setGpsError(null);
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setValue("ubicacionGps.latitud", latitude.toFixed(6), { shouldDirty: true });
+        setValue("ubicacionGps.longitud", longitude.toFixed(6), { shouldDirty: true });
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsError(
+          err.code === 1
+            ? "Permiso de ubicación denegado. Habilítalo en el navegador."
+            : err.code === 2
+              ? "No se pudo obtener la ubicación (señal débil o GPS apagado)."
+              : err.code === 3
+                ? "Tiempo de espera agotado."
+                : "Error obteniendo la ubicación.",
+        );
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  };
 
   const hasIncumplimiento = condicionesAmbientales.some(
     (c) => c.cumple === false,
@@ -1149,6 +1200,109 @@ const DiagnosticoForm = ({ initialData, onSubmit, onCancel }) => {
               )}
             </Box>
           )}
+        </Grid>
+
+        {/* E. Ubicación GPS del Predio */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" fontWeight="bold">
+            E. Ubicación GPS del Predio
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Ingresá las coordenadas en grados decimales (WGS84). Usá "Mi ubicación actual"
+              si estás en el predio con un dispositivo con GPS.
+            </Typography>
+
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Controller
+                  name="ubicacionGps.latitud"
+                  control={control}
+                  rules={{
+                    validate: (v) => {
+                      if (v === "" || v == null) return true;
+                      const n = parseFloat(v);
+                      if (!Number.isFinite(n)) return "Latitud inválida";
+                      if (n < -90 || n > 90) return "Latitud debe estar entre -90 y 90";
+                      return true;
+                    },
+                  }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Latitud"
+                      placeholder="-4.123456"
+                      type="number"
+                      inputProps={{ step: "any" }}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message || "Grados decimales WGS84"}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Controller
+                  name="ubicacionGps.longitud"
+                  control={control}
+                  rules={{
+                    validate: (v) => {
+                      if (v === "" || v == null) return true;
+                      const n = parseFloat(v);
+                      if (!Number.isFinite(n)) return "Longitud inválida";
+                      if (n < -180 || n > 180) return "Longitud debe estar entre -180 y 180";
+                      return true;
+                    },
+                  }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Longitud"
+                      placeholder="-77.123456"
+                      type="number"
+                      inputProps={{ step: "any" }}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message || "Grados decimales WGS84"}
+                    />
+                  )}
+                />
+              </Grid>
+            </Grid>
+
+            <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+              <Button
+                variant="outlined"
+                startIcon={gpsLoading ? <CircularProgress size={16} /> : <MyLocationIcon />}
+                onClick={handleUseCurrentLocation}
+                disabled={gpsLoading}
+                sx={{ minHeight: { xs: 44, sm: "auto" } }}
+              >
+                {gpsLoading ? "Obteniendo..." : "Usar mi ubicación actual"}
+              </Button>
+              {gpsLink && (
+                <Button
+                  variant="text"
+                  component="a"
+                  href={gpsLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  startIcon={<MapIcon />}
+                  sx={{ minHeight: { xs: 44, sm: "auto" } }}
+                >
+                  Ver en Google Maps
+                </Button>
+              )}
+            </Box>
+
+            {gpsError && (
+              <Alert severity="error" sx={{ mt: 1 }} onClose={() => setGpsError(null)}>
+                {gpsError}
+              </Alert>
+            )}
+          </Paper>
         </Grid>
 
         {/* F. Servicios Públicos */}
