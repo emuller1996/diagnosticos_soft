@@ -474,6 +474,39 @@ const renderConstanciaVisita = (doc, data) => {
   ]);
 };
 
+const renderUbicacionGps = (doc, data) => {
+  const gps = data?.ubicacionGps || {};
+  const latStr = gps.latitud;
+  const lngStr = gps.longitud;
+  const lat = parseFloat(latStr);
+  const lng = parseFloat(lngStr);
+  const hasValues = Number.isFinite(lat) && Number.isFinite(lng);
+
+  // Si no hay coordenadas válidas, omitimos la sección.
+  if (!hasValues) return;
+
+  doc.sectionHeader('E. UBICACIÓN GPS DEL PREDIO');
+
+  doc.fieldRow([
+    { label: 'LATITUD', value: latStr },
+    { label: 'LONGITUD', value: lngStr },
+  ]);
+
+  // Link clickeable a Google Maps.
+  const url = `https://www.google.com/maps?q=${lat},${lng}`;
+  doc.spacer(2);
+  doc.doc.setFont('helvetica', 'bold');
+  doc.doc.setFontSize(8);
+  doc.doc.setTextColor(0);
+  doc.doc.text('COORDENADAS GPS (ENLACE):', doc.marginX, doc.cursorY + 3);
+  doc.doc.setFont('helvetica', 'normal');
+  doc.doc.setFontSize(10);
+  doc.doc.setTextColor(30, 64, 175);
+  doc.doc.textWithLink('Ver en Google Maps', doc.marginX, doc.cursorY + 9, { url });
+  doc.doc.setTextColor(0);
+  doc.cursorY += 12;
+};
+
 const renderConceptoTecnico = (doc, data) => {
   const concepto = data.conceptoTecnico || {};
   const requisitos = Array.isArray(concepto.requisitosGenerales) ? concepto.requisitosGenerales : [];
@@ -622,6 +655,7 @@ const sections = [
   renderCondicionHogar,
   renderTenencia,
   renderCondicionesAmbientales,
+  renderUbicacionGps,
   renderServiciosPublicos,
   renderLevantamiento,
   renderMiembros,
