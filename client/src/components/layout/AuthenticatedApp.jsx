@@ -6,6 +6,8 @@ import Dashboard from '../../pages/Dashboard';
 import ProjectsPage from '../../pages/proyectos/ProjectsPage';
 import DiagnosticosPage from '../../pages/diagnosticos/DiagnosticosPage';
 import NuevoDiagnosticoPage from '../../pages/diagnosticos/NuevoDiagnosticoPage';
+import CaracterizacionPescaPage from '../../pages/caracterizacion-pesca/CaracterizacionPescaPage';
+import FormCaraterizacionPescaPage from '../../pages/caracterizacion-pesca/nuevo/FormCaraterizacionPesca';
 
 const AuthenticatedApp = () => {
   const { logout } = useAuth();
@@ -17,6 +19,8 @@ const AuthenticatedApp = () => {
         <Route path="/dashboard/proyectos" element={<ProjectsPage />} />
         <Route path="/dashboard/diagnosticos" element={<DiagnosticosPage />} />
         <Route path="/dashboard/diagnosticos/nuevo" element={<NuevoDiagnosticoPage />} />
+        <Route path="/dashboard/caracterizacion-pesca" element={<CaracterizacionPescaPage />} />
+        <Route path="/dashboard/caracterizacion-pesca/nuevo" element={<FormCaraterizacionPescaPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
