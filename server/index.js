@@ -5,6 +5,7 @@ import path from 'path';
 import userRoutes from './routes/userRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
 import diagnosticoRoutes from './routes/diagnosticoRoutes.js';
+import caracterizacionPescaRoutes from './routes/caracterizacionPescaRoutes.js';
 import morgan from "morgan";
 
 dotenv.config({ path: '.env' });
@@ -37,6 +38,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/diagnosticos', diagnosticoRoutes);
+app.use('/api/caracterizacion-pesca', caracterizacionPescaRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
