@@ -20,7 +20,8 @@ import {
   Dashboard as DashboardIcon, 
   Assignment as ProjectIcon, 
   Menu as MenuIcon, 
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  Phishing
 } from '@mui/icons-material';
 import DataExplorationIcon from '@mui/icons-material/DataExploration';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
@@ -42,6 +43,11 @@ const MENU_ITEMS = [
     text: 'Diagnosticos', 
     icon: <DataExplorationIcon />, 
     path: '/dashboard/diagnosticos' 
+  },
+  { 
+    text: 'Caracterizacion Pesca', 
+    icon: <Phishing />, 
+    path: '/dashboard/caracterizacion-pesca' 
   },
 ];
 
