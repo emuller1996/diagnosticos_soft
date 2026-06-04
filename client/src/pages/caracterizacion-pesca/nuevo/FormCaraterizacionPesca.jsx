@@ -12,14 +12,22 @@ import {
     Radio,
     InputAdornment,
     Paper,
-    Divider
+    Divider,
+    Alert,
+    CircularProgress
 } from "@mui/material";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { useCaracterizacionPesca } from "../../../hooks/useCaracterizacionPesca";
 
 export default function FormCaraterizacionPescaPage() {
     const navigate = useNavigate();
+    const { createCaracterizacion } = useCaracterizacionPesca();
+    
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState(null);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
 
     const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
         defaultValues: {
@@ -48,30 +56,33 @@ export default function FormCaraterizacionPescaPage() {
     const jovenes = watch("jovenes");
     const adultos = watch("adultos");
     const adultosMayores = watch("adultosMayores");
-    const hombres = watch("hombres");
-    const mujeres = watch("mujeres");
 
-
-
-    // Agregar este useEffect
     useEffect(() => {
         const total = (ninios || 0) + (jovenes || 0) + (adultos || 0) + (adultosMayores || 0);
         setValue("totalPersonas", total);
     }, [ninios, jovenes, adultos, adultosMayores, setValue]);
 
-    const actualizarTotalPersonas = () => {
-        const suma = (ninios || 0) + (jovenes || 0) + (adultos || 0) + (adultosMayores || 0);
-        setValue("totalPersonas", suma);
-    };
+    const onSubmit = async (data) => {
+        setIsSubmitting(true);
+        setSubmitError(null);
+        setSubmitSuccess(false);
 
-    const onSubmit = (data) => {
-        console.log("Datos del formulario:", data);
-        alert("Formulario enviado exitosamente");
-        navigate(-1);
+        try {
+            await createCaracterizacion(data);
+            setSubmitSuccess(true);
+            // Redirigir después de un breve delay para que el usuario vea el mensaje de éxito
+            setTimeout(() => {
+                navigate("/dashboard/caracterizacion-pesca");
+            }, 2000);
+        } catch (err) {
+            setSubmitError(err.message || "Ocurrió un error al guardar la ficha");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
-        <Box sx={{ maxWidth: 1200, mx: "auto", p: 3 }}>
+        <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 3 } }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
                 <Button onClick={() => navigate(-1)} sx={{ minWidth: "auto", mr: 2 }}>
                     <ArrowBack />
@@ -81,8 +92,20 @@ export default function FormCaraterizacionPescaPage() {
                 </Typography>
             </Box>
 
+            {submitError && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {submitError}
+                </Alert>
+            )}
+
+            {submitSuccess && (
+                <Alert severity="success" sx={{ mb: 3 }}>
+                    ¡Ficha guardada exitosamente! Redirigiendo...
+                </Alert>
+            )}
+
             <form onSubmit={handleSubmit(onSubmit)}>
-                <Paper elevation={3} sx={{ p: 3 }}>
+                <Paper elevation={3} sx={{ p: { xs: 2, md: 3 } }}>
                     {/* SECCIÓN 1: IDENTIFICACIÓN */}
                     <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: "#2E7D32" }}>
                         1. IDENTIFICACIÓN
@@ -90,11 +113,10 @@ export default function FormCaraterizacionPescaPage() {
                     <Divider sx={{ mb: 3 }} />
 
                     <Grid container spacing={3}>
-                        <Grid item size={{ xs: 12, md: 6, lg: 4 }}>
+                        <Grid item xs={12} md={6} lg={4}>
                             <Controller
                                 name="nombrePescador"
                                 control={control}
-
                                 rules={{ required: "Este campo es requerido" }}
                                 render={({ field }) => (
                                     <TextField
@@ -108,7 +130,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12, md: 6, lg: 4 }}>
+                        <Grid item xs={12} md={6} lg={4}>
                             <Controller
                                 name="documento"
                                 control={control}
@@ -125,7 +147,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12, md: 6, lg: 4 }}>
+                        <Grid item xs={12} md={6} lg={4}>
                             <Controller
                                 name="consejoComunitario"
                                 control={control}
@@ -139,7 +161,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12, md: 6, lg: 4 }}>
+                        <Grid item xs={12} md={6} lg={4}>
                             <Controller
                                 name="asociacion"
                                 control={control}
@@ -153,7 +175,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12, md: 6, lg: 4 }}>
+                        <Grid item xs={12} md={6} lg={4}>
                             <Controller
                                 name="comunidad"
                                 control={control}
@@ -167,7 +189,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12, md: 6, lg: 4 }}>
+                        <Grid item xs={12} md={6} lg={4}>
                             <Controller
                                 name="telefono"
                                 control={control}
@@ -194,7 +216,7 @@ export default function FormCaraterizacionPescaPage() {
                     </Typography>
 
                     <Grid container spacing={3}>
-                        <Grid item size={{ xs: 12, md: 3 }}>
+                        <Grid item xs={12} md={3}>
                             <TextField
                                 label="Total de personas"
                                 value={totalPersonas || 0}
@@ -208,7 +230,7 @@ export default function FormCaraterizacionPescaPage() {
                     </Grid>
 
                     <Grid container spacing={3} sx={{ mt: 2 }}>
-                        <Grid item size={{ xs: 6, md: 3, }}>
+                        <Grid item xs={6} md={3}>
                             <Controller
                                 name="ninios"
                                 control={control}
@@ -225,7 +247,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 6, md: 3, }}>
+                        <Grid item xs={6} md={3}>
                             <Controller
                                 name="jovenes"
                                 control={control}
@@ -242,7 +264,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 6, md: 3, }}>
+                        <Grid item xs={6} md={3}>
                             <Controller
                                 name="adultos"
                                 control={control}
@@ -259,7 +281,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 6, md: 3, }}>
+                        <Grid item xs={6} md={3}>
                             <Controller
                                 name="adultosMayores"
                                 control={control}
@@ -278,7 +300,7 @@ export default function FormCaraterizacionPescaPage() {
                     </Grid>
 
                     <Grid container spacing={3} sx={{ mt: 2 }}>
-                        <Grid item size={{ xs: 12, md: 3 }}>
+                        <Grid item xs={12} md={3}>
                             <Controller
                                 name="hombres"
                                 control={control}
@@ -294,7 +316,7 @@ export default function FormCaraterizacionPescaPage() {
                             />
                         </Grid>
 
-                        <Grid item size={{ xs: 12, md: 3 }}>
+                        <Grid item xs={12} md={3}>
                             <Controller
                                 name="mujeres"
                                 control={control}
@@ -424,11 +446,24 @@ export default function FormCaraterizacionPescaPage() {
 
                     {/* BOTONES DE ACCIÓN */}
                     <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 4 }}>
-                        <Button variant="outlined" onClick={() => navigate(-1)}>
+                        <Button 
+                            variant="outlined" 
+                            onClick={() => navigate(-1)}
+                            disabled={isSubmitting}
+                        >
                             Cancelar
                         </Button>
-                        <Button variant="contained" type="submit" color="primary">
-                            Guardar Ficha
+                        <Button 
+                            variant="contained" 
+                            type="submit" 
+                            color="primary"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? (
+                                <CircularProgress size={24} color="inherit" />
+                            ) : (
+                                "Guardar Ficha"
+                            )}
                         </Button>
                     </Box>
                 </Paper>
