@@ -19,9 +19,10 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { Add, Edit, Visibility, Delete, Refresh } from "@mui/icons-material";
+import { Add, Edit, Visibility, Delete, Refresh, PictureAsPdf } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../hooks/useCaracterizacionPesca";
+import { generateCaracterizacionPescaPdf } from "../../services/pdf/caracterizacionPescaPdf";
 
 export default function CaracterizacionPescaPage() {
   const navigate = useNavigate();
@@ -29,6 +30,23 @@ export default function CaracterizacionPescaPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { data, loading, error, fetchCaracterizaciones } =
     useCaracterizacionPesca();
+
+  const handleDownloadPdf = async (item) => {
+    try {
+      const blob = await generateCaracterizacionPescaPdf(item);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Caracterizacion_${item.nombrePescador || item.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      alert("Hubo un error al generar el PDF");
+    }
+  };
 
   if (loading) {
     return (
@@ -164,18 +182,25 @@ export default function CaracterizacionPescaPage() {
                           >
                             <Visibility />
                           </IconButton>
-                          <IconButton
-                            color="secondary"
-                            onClick={() =>
-                              navigate(
-                                `/dashboard/caracterizacion-pesca/editar/${item.id}`,
-                              )
-                            }
-                            title="Editar"
-                          >
-                            <Edit />
-                          </IconButton>
-                        </Box>
+                           <IconButton
+                             color="secondary"
+                             onClick={() =>
+                               navigate(
+                                 `/dashboard/caracterizacion-pesca/editar/${item.id}`,
+                               )
+                             }
+                             title="Editar"
+                           >
+                             <Edit />
+                           </IconButton>
+                           <IconButton
+                             color="info"
+                             onClick={() => handleDownloadPdf(item)}
+                             title="Descargar PDF"
+                           >
+                             <PictureAsPdf />
+                           </IconButton>
+                         </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -202,14 +227,14 @@ export default function CaracterizacionPescaPage() {
                         alignItems="flex-start"
                         mb={2}
                       >
-                        <Box>
-                          <Typography
-                            variant="subtitle1"
-                            fontWeight="bold"
-                            color="primary"
-                          >
-                            {item.nombre || `Ficha #${item.id}`}
-                          </Typography>
+                         <Box>
+                           <Typography
+                             variant="subtitle1"
+                             fontWeight="bold"
+                             color="primary"
+                           >
+                             {item.nombrePescador || `Ficha #${item.id}`}
+                           </Typography>
                           <Typography
                             variant="body2"
                             color="text.secondary"
@@ -234,18 +259,25 @@ export default function CaracterizacionPescaPage() {
                           >
                             <Visibility fontSize="small" />
                           </IconButton>
-                          <IconButton
-                            size="small"
-                            color="secondary"
-                            onClick={() =>
-                              navigate(
-                                `/dashboard/caracterizacion-pesca/editar/${item.id}`,
-                              )
-                            }
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                        </Box>
+                           <IconButton
+                             size="small"
+                             color="secondary"
+                             onClick={() =>
+                               navigate(
+                                 `/dashboard/caracterizacion-pesca/editar/${item.id}`,
+                               )
+                             }
+                           >
+                             <Edit fontSize="small" />
+                           </IconButton>
+                           <IconButton
+                             size="small"
+                             color="info"
+                             onClick={() => handleDownloadPdf(item)}
+                           >
+                             <PictureAsPdf fontSize="small" />
+                           </IconButton>
+                         </Box>
                       </Box>
 
                       <Box
