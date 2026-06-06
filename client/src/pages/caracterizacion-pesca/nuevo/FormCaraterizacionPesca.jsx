@@ -1084,96 +1084,82 @@ export default function FormCaraterizacionPescaPage() {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <FormControl component="fieldset">
-                <Controller
-                  name="necesidadesPrioritarias"
-                  control={control}
-                  render={({ field }) => (
-                    <RadioGroup
-                      {...field}
-                      sx={{
-                        display: "flex",
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        gap: 2,
-                      }}
-                    >
-                      <FormControlLabel
-                        value="embarcacion"
-                        control={<Radio />}
-                        label="Embarcación"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("embarcacion")
-                        }
-                      />
-                      <FormControlLabel
-                        value="motor"
-                        control={<Radio />}
-                        label="Motor"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("motor")
-                        }
-                      />
-                      <FormControlLabel
-                        value="equipos-pesca"
-                        control={<Radio />}
-                        label="Equipos de pesca"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("equipos-pesca")
-                        }
-                      />
-                      <FormControlLabel
-                        value="sistema-frio"
-                        control={<Radio />}
-                        label="Sistema de frío"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("sistema-frio")
-                        }
-                      />
-                      <FormControlLabel
-                        value="transporte"
-                        control={<Radio />}
-                        label="Transporte"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("transporte")
-                        }
-                      />
-                      <FormControlLabel
-                        value="capacitacion"
-                        control={<Radio />}
-                        label="Capacitación"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("capacitacion")
-                        }
-                      />
-                      <FormControlLabel
-                        value="comercializacion"
-                        control={<Radio />}
-                        label="Comercialización"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("comercializacion")
-                        }
-                      />
-                    </RadioGroup>
-                  )}
-                />
-              </FormControl>
-              {watch("necesidadesPrioritarias")?.length === 3 && (
-                <Typography
-                  color="info"
-                  variant="caption"
-                  display="block"
-                  sx={{ mt: 1 }}
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 2,
+                  }}
                 >
-                  Has seleccionado el máximo de 3 necesidades prioritarias.
+                  {[
+                    { value: "embarcacion", label: "Embarcación" },
+                    { value: "motor", label: "Motor" },
+                    { value: "equipos-pesca", label: "Equipos de pesca" },
+                    { value: "sistema-frio", label: "Sistema de frío" },
+                    { value: "transporte", label: "Transporte" },
+                    { value: "capacitacion", label: "Capacitación" },
+                    { value: "comercializacion", label: "Comercialización" },
+                  ].map((item) => (
+                    <FormControlLabel
+                      key={item.value}
+                      control={
+                        <Controller
+                          name="necesidadesPrioritarias"
+                          control={control}
+                          render={({ field }) => {
+                            const isSelected =
+                              field.value?.includes(item.value) || false;
+                            const isDisabled =
+                              !isSelected && (field.value?.length || 0) >= 3;
+
+                            return (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={isDisabled}
+                                onChange={(e) => {
+                                  const currentValue = field.value || [];
+                                  if (e.target.checked) {
+                                    field.onChange([
+                                      ...currentValue,
+                                      item.value,
+                                    ]);
+                                  } else {
+                                    field.onChange(
+                                      currentValue.filter(
+                                        (v) => v !== item.value,
+                                      ),
+                                    );
+                                  }
+                                }}
+                                style={{ marginRight: 8 }}
+                              />
+                            );
+                          }}
+                        />
+                      }
+                      label={item.label}
+                    />
+                  ))}
+                </Box>
+              </FormControl>
+
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" display="block">
+                  Seleccionadas: {watch("necesidadesPrioritarias")?.length || 0}{" "}
+                  de 3
                 </Typography>
-              )}
+                {(watch("necesidadesPrioritarias")?.length || 0) === 3 && (
+                  <Typography
+                    color="success.main"
+                    variant="caption"
+                    display="block"
+                  >
+                    ✓ Límite alcanzado
+                  </Typography>
+                )}
+              </Box>
             </Grid>
           </Grid>
 
