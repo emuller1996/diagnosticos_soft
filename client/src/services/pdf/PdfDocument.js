@@ -191,6 +191,26 @@ export class PdfDocument {
     return window.open(this.doc.output('bloburl'), '_blank');
   }
 
+  addImage(imageB64, { x, y, width, height, caption } = {}) {
+    const imgWidth = width || this.contentWidth;
+    const imgHeight = height || (this.doc.getImageProperties(imageB64).height * (imgWidth / this.doc.getImageProperties(imageB64).width));
+    
+    this.ensureSpace(imgHeight + (caption ? 10 : 0));
+    
+    const posX = x !== undefined ? x : this.marginX;
+    const posY = y !== undefined ? y : this.cursorY;
+
+    this.doc.addImage(imageB64, 'JPEG', posX, posY, imgWidth, imgHeight);
+    
+    if (caption) {
+      this.doc.setFont('helvetica', 'italic');
+      this.doc.setFontSize(8);
+      this.doc.text(caption, posX, posY + imgHeight + 4);
+    }
+    
+    this.cursorY = posY + imgHeight + (caption ? 10 : 5);
+  }
+
   getBlob() {
     return this.doc.output('blob');
   }
