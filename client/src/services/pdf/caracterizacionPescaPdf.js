@@ -86,12 +86,135 @@ export const generateCaracterizacionPescaPdf = async (data) => {
     'madera': 'Madera'
   };
 
-  doc.fieldRow([
-    { label: "Tipo de embarcación:", value: embMap[data.tipoEmbarcacion] || data.tipoEmbarcacion || "N/A" },
-  ]);
+    doc.fieldRow([
+      { label: "Tipo de embarcación:", value: embMap[data.tipoEmbarcacion] || data.tipoEmbarcacion || "N/A" },
+    ]);
 
-  doc.spacer(20);
-  doc.subtitle("Fin del documento", { size: 8 });
+    const estadoMap = { 'bueno': 'Bueno', 'regular': 'Regular', 'malo': 'Malo' };
+    const siNoMap = { 'si': 'SÍ', 'no': 'NO' };
 
-  return await doc.getBlob();
+    doc.fieldRow([
+      { label: "Estado embarcación:", value: estadoMap[data.estadoEmbarcacion] || data.estadoEmbarcacion || "N/A" },
+      { label: "Tiene motor:", value: siNoMap[data.tieneMotor] || data.tieneMotor || "N/A" },
+    ]);
+
+    if (data.tieneMotor === 'si') {
+      doc.fieldRow([
+        { label: "HP Motor:", value: data.hpMotor || "N/A" },
+        { label: "Estado Motor:", value: estadoMap[data.estadoMotor] || data.estadoMotor || "N/A" },
+      ]);
+    }
+
+    doc.spacer(10);
+
+    // SECCIÓN 5: PRODUCCIÓN (ESTIMADA)
+    doc.sectionHeader("5. PRODUCCIÓN (ESTIMADA)");
+    const capturaMap = { 'poco': 'Poco (<20 kg)', 'medio': 'Medio (20-50 kg)', 'alto': 'Alto (>50 kg)' };
+    const diasMap = { '1-2': '1-2 días', '3-4': '3-4 días', '5+': '5 o más días' };
+
+    doc.fieldRow([
+      { label: "Captura por día:", value: capturaMap[data.capturaPorDia] || data.capturaPorDia || "N/A" },
+      { label: "Días de pesca/semana:", value: diasMap[data.diasPescaSemana] || data.diasPescaSemana || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 6: MANEJO DEL PESCADO
+    doc.sectionHeader("6. MANEJO DEL PESCADO");
+    const conservaMap = { 'hielo': 'Hielo', 'sal': 'Sal', 'no-conserva': 'No conserva' };
+    const tiempoVentaMap = { 'mismo-dia': 'Mismo día', '1-dia': '1 día', 'mas-1-dia': 'Más de 1 día' };
+    const perdidaMap = { 'mucha': 'Mucha', 'algo': 'Algo', 'muy-poca': 'Muy poca' };
+
+    doc.fieldRow([
+      { label: "Conservación:", value: conservaMap[data.conservaPescado] || data.conservaPescado || "N/A" },
+      { label: "Tiempo antes venta:", value: tiempoVentaMap[data.tiempoAntesVender] || data.tiempoAntesVender || "N/A" },
+    ]);
+    doc.fieldRow([
+      { label: "Pérdida de pescado:", value: perdidaMap[data.perdidaPescado] || data.perdidaPescado || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 7: COMERCIALIZACIÓN
+    doc.sectionHeader("7. COMERCIALIZACIÓN");
+    const ventaMap = { 
+      'asociacion': 'Asociación', 
+      'consejo-comunitario': 'Consejo Comunitario', 
+      'comunidad-local': 'Comunidad Local', 
+      'intermediario': 'Intermediario', 
+      'buenaventura': 'Buenaventura' 
+    };
+
+    doc.fieldRow([
+      { label: "Venta principal:", value: ventaMap[data.ventaPrincipal] || data.ventaPrincipal || "N/A" },
+    ]);
+
+    if (data.ventaPrincipal === 'buenaventura') {
+      doc.spacer(5);
+      doc.subtitle("Detalles transporte a Buenaventura:", { size: 9, color: [0, 0, 0] });
+      
+      const transMap = { 'lancha': 'Lancha', 'bote-propio': 'Bote propio', 'transporte-contratado': 'Transporte contratado', 'otro': 'Otro' };
+      const tTiempoMap = { 'menos-2h': 'Menos de 2 horas', '2-5h': '2-5 horas', 'mas-5h': 'Más de 5 horas' };
+      const probMap = { 'bajo-precio': 'Bajo precio', 'transporte': 'Transporte', 'se-daña': 'Se daña el pescado', 'intermediarios': 'Intermediarios', 'otro': 'Otro' };
+
+      doc.fieldRow([
+        { label: "Medio transporte:", value: transMap[data.medioTransporte] || data.medioTransporte || "N/A" },
+        { label: "Tiempo transporte:", value: tTiempoMap[data.tiempoTransporte] || data.tiempoTransporte || "N/A" },
+      ]);
+      doc.fieldRow([
+        { label: "Problemas principales:", value: probMap[data.problemasPrincipales] || data.problemasPrincipales || "N/A" },
+      ]);
+      if (data.otroMedioTransporte) {
+        doc.fieldRow([{ label: "Otro medio:", value: data.otroMedioTransporte }]);
+      }
+      if (data.otroProblema) {
+        doc.fieldRow([{ label: "Otro problema:", value: data.otroProblema }]);
+      }
+    }
+
+    doc.spacer(10);
+
+    // SECCIÓN 8: NECESIDADES PRIORITARIAS
+    doc.sectionHeader("8. NECESIDADES PRIORITARIAS");
+    const needsList = [
+      { value: "embarcacion", label: "Embarcación" },
+      { value: "motor", label: "Motor" },
+      { value: "equipos-pesca", label: "Equipos de pesca" },
+      { value: "sistema-frio", label: "Sistema de frío" },
+      { value: "transporte", label: "Transporte" },
+      { value: "capacitacion", label: "Capacitación" },
+      { value: "comercializacion", label: "Comercialización" },
+    ];
+
+    const selectedNeeds = (data.necesidadesPrioritarias || []).map(val => ({
+      label: needsList.find(n => n.value === val)?.label || val,
+      checked: true
+    })).concat(
+      needsList.filter(n => !(data.necesidadesPrioritarias || []).includes(n.value)).map(n => ({
+        label: n.label,
+        checked: false
+      }))
+    );
+
+    doc.checkboxList(selectedNeeds, { title: "Necesidades identificadas:" });
+
+    doc.spacer(10);
+
+    // SECCIÓN 9: ANEXOS FOTOGRÁFICOS
+    if (data.anexosFotograficos && data.anexosFotograficos.length > 0) {
+      doc.sectionHeader("9. ANEXOS FOTOGRÁFICOS");
+      doc.spacer(5);
+      
+      for (let i = 0; i < data.anexosFotograficos.length; i++) {
+        const anexo = data.anexosFotograficos[i];
+        if (anexo.imagen) {
+          doc.addImage(anexo.imagen, { 
+            caption: `Foto ${i + 1}: ${anexo.observaciones || 'Sin observaciones'}` 
+          });
+          doc.spacer(10);
+        }
+      }
+    }
+
+    return await doc.getBlob();
 };

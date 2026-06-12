@@ -15,11 +15,14 @@ import {
   Divider,
   Alert,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
+import { Delete as DeleteIcon, AddPhotoAlternate as AddPhotoIcon } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../../hooks/useCaracterizacionPesca";
+import { uploadService } from "../../../services/uploadService";
 
 export default function FormCaraterizacionPescaPage() {
   const navigate = useNavigate();
@@ -28,6 +31,7 @@ export default function FormCaraterizacionPescaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [anexoFotos, setAnexoFotos] = useState([]);
 
   const {
     control,
@@ -96,17 +100,58 @@ export default function FormCaraterizacionPescaPage() {
     setSubmitSuccess(false);
 
     try {
-      await createCaracterizacion(data);
-      setSubmitSuccess(true);
-      // Redirigir después de un breve delay para que el usuario vea el mensaje de éxito
+      const created = await createCaracterizacion(data);
+      const id = created?.id;
+      const uploadErrors = [];
+
+      if (id && anexoFotos.length > 0) {
+        for (let i = 0; i < anexoFotos.length; i++) {
+          const { file, observaciones } = anexoFotos[i];
+          if (file) {
+            try {
+              await uploadService.uploadPescaAnexoFoto(id, file, observaciones || '');
+            } catch (e) {
+              uploadErrors.push(`foto ${i + 1}: ${e?.response?.data?.message || e.message}`);
+            }
+          }
+        }
+      }
+
+      if (uploadErrors.length > 0) {
+        setSubmitError(`Ficha creada, pero hubo errores al subir algunas fotos: ${uploadErrors.join('; ')}`);
+        setSubmitSuccess(true);
+      } else {
+        setSubmitSuccess(true);
+      }
+
       setTimeout(() => {
         navigate("/dashboard/caracterizacion-pesca");
-      }, 2000);
+      }, 3000);
     } catch (err) {
       setSubmitError(err.message || "Ocurrió un error al guardar la ficha");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const addFoto = () => {
+    setAnexoFotos([...anexoFotos, { file: null, observaciones: "" }]);
+  };
+
+  const removeFoto = (index) => {
+    setAnexoFotos(anexoFotos.filter((_, i) => i !== index));
+  };
+
+  const handleFileChange = (index, file) => {
+    const updatedFotos = [...anexoFotos];
+    updatedFotos[index].file = file;
+    setAnexoFotos(updatedFotos);
+  };
+
+  const handleObsChange = (index, obs) => {
+    const updatedFotos = [...anexoFotos];
+    updatedFotos[index].observaciones = obs;
+    setAnexoFotos(updatedFotos);
   };
 
   return (
@@ -665,7 +710,7 @@ export default function FormCaraterizacionPescaPage() {
                       <FormControlLabel
                         value="poco"
                         control={<Radio />}
-                        label="Poco (&lt;20 kg)"
+                        label="Poco (<20 kg)"
                       />
                       <FormControlLabel
                         value="medio"
@@ -675,7 +720,7 @@ export default function FormCaraterizacionPescaPage() {
                       <FormControlLabel
                         value="alto"
                         control={<Radio />}
-                        label="Alto (&gt;50 kg)"
+                        label="Alto (>50 kg)"
                       />
                     </RadioGroup>
                   )}
@@ -1084,97 +1129,147 @@ export default function FormCaraterizacionPescaPage() {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <FormControl component="fieldset">
-                <Controller
-                  name="necesidadesPrioritarias"
-                  control={control}
-                  render={({ field }) => (
-                    <RadioGroup
-                      {...field}
-                      sx={{
-                        display: "flex",
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        gap: 2,
-                      }}
-                    >
-                      <FormControlLabel
-                        value="embarcacion"
-                        control={<Radio />}
-                        label="Embarcación"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("embarcacion")
-                        }
-                      />
-                      <FormControlLabel
-                        value="motor"
-                        control={<Radio />}
-                        label="Motor"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("motor")
-                        }
-                      />
-                      <FormControlLabel
-                        value="equipos-pesca"
-                        control={<Radio />}
-                        label="Equipos de pesca"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("equipos-pesca")
-                        }
-                      />
-                      <FormControlLabel
-                        value="sistema-frio"
-                        control={<Radio />}
-                        label="Sistema de frío"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("sistema-frio")
-                        }
-                      />
-                      <FormControlLabel
-                        value="transporte"
-                        control={<Radio />}
-                        label="Transporte"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("transporte")
-                        }
-                      />
-                      <FormControlLabel
-                        value="capacitacion"
-                        control={<Radio />}
-                        label="Capacitación"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("capacitacion")
-                        }
-                      />
-                      <FormControlLabel
-                        value="comercializacion"
-                        control={<Radio />}
-                        label="Comercialización"
-                        disabled={
-                          field.value?.length >= 3 &&
-                          !field.value.includes("comercializacion")
-                        }
-                      />
-                    </RadioGroup>
-                  )}
-                />
-              </FormControl>
-              {watch("necesidadesPrioritarias")?.length === 3 && (
-                <Typography
-                  color="info"
-                  variant="caption"
-                  display="block"
-                  sx={{ mt: 1 }}
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 2,
+                  }}
                 >
-                  Has seleccionado el máximo de 3 necesidades prioritarias.
+                  {[
+                    { value: "embarcacion", label: "Embarcación" },
+                    { value: "motor", label: "Motor" },
+                    { value: "equipos-pesca", label: "Equipos de pesca" },
+                    { value: "sistema-frio", label: "Sistema de frío" },
+                    { value: "transporte", label: "Transporte" },
+                    { value: "capacitacion", label: "Capacitación" },
+                    { value: "comercializacion", label: "Comercialización" },
+                  ].map((item) => (
+                    <FormControlLabel
+                      key={item.value}
+                      control={
+                        <Controller
+                          name="necesidadesPrioritarias"
+                          control={control}
+                          render={({ field }) => {
+                            const isSelected =
+                              field.value?.includes(item.value) || false;
+                            const isDisabled =
+                              !isSelected && (field.value?.length || 0) >= 3;
+
+                            return (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={isDisabled}
+                                onChange={(e) => {
+                                  const currentValue = field.value || [];
+                                  if (e.target.checked) {
+                                    field.onChange([
+                                      ...currentValue,
+                                      item.value,
+                                    ]);
+                                  } else {
+                                    field.onChange(
+                                      currentValue.filter(
+                                        (v) => v !== item.value,
+                                      ),
+                                    );
+                                  }
+                                }}
+                                style={{ marginRight: 8 }}
+                              />
+                            );
+                          }}
+                        />
+                      }
+                      label={item.label}
+                    />
+                  ))}
+                </Box>
+              </FormControl>
+
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" display="block">
+                  Seleccionadas: {watch("necesidadesPrioritarias")?.length || 0}{" "}
+                  de 3
                 </Typography>
-              )}
+                {(watch("necesidadesPrioritarias")?.length || 0) === 3 && (
+                  <Typography
+                    color="success.main"
+                    variant="caption"
+                    display="block"
+                  >
+                    ✓ Límite alcanzado
+                  </Typography>
+                )}
+              </Box>
             </Grid>
+          </Grid>
+
+          {/* SECCIÓN 9: ANEXOS FOTOGRÁFICOS */}
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}
+          >
+            9. ANEXOS FOTOGRÁFICOS
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="body2" color="textSecondary">
+              Cargue las fotografías que sirvan como evidencia de la caracterización.
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddPhotoIcon />}
+              onClick={addFoto}
+              size="small"
+              color="success"
+            >
+              Agregar Foto
+            </Button>
+          </Box>
+
+          <Grid container spacing={3}>
+            {anexoFotos.map((foto, index) => (
+              <Grid item xs={12} md={6} key={index}>
+                <Paper variant="outlined" sx={{ p: 2, position: 'relative', bgcolor: '#f9f9f9' }}>
+                  <IconButton
+                    onClick={() => removeFoto(index)}
+                    sx={{ position: 'absolute', top: 5, right: 5, color: 'error.main' }}
+                    size="small"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Typography variant="subtitle2">Foto {index + 1}</Typography>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      fullWidth
+                      startIcon={<AddPhotoIcon />}
+                    >
+                      {foto.file ? foto.file.name : "Seleccionar imagen"}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(index, e.target.files[0])}
+                      />
+                    </Button>
+                    <TextField
+                      label="Observaciones"
+                      fullWidth
+                      size="small"
+                      value={foto.observaciones}
+                      onChange={(e) => handleObsChange(index, e.target.value)}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+            ))}
           </Grid>
 
           {/* BOTONES DE ACCIÓN */}
