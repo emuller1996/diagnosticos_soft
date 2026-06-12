@@ -15,11 +15,14 @@ import {
   Divider,
   Alert,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
+import { Delete as DeleteIcon, AddPhotoAlternate as AddPhotoIcon } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../../hooks/useCaracterizacionPesca";
+import { uploadService } from "../../../services/uploadService";
 
 export default function FormCaraterizacionPescaPage() {
   const navigate = useNavigate();
@@ -28,6 +31,7 @@ export default function FormCaraterizacionPescaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [anexoFotos, setAnexoFotos] = useState([]);
 
   const {
     control,
@@ -96,17 +100,58 @@ export default function FormCaraterizacionPescaPage() {
     setSubmitSuccess(false);
 
     try {
-      await createCaracterizacion(data);
-      setSubmitSuccess(true);
-      // Redirigir después de un breve delay para que el usuario vea el mensaje de éxito
+      const created = await createCaracterizacion(data);
+      const id = created?.id;
+      const uploadErrors = [];
+
+      if (id && anexoFotos.length > 0) {
+        for (let i = 0; i < anexoFotos.length; i++) {
+          const { file, observaciones } = anexoFotos[i];
+          if (file) {
+            try {
+              await uploadService.uploadPescaAnexoFoto(id, file, observaciones || '');
+            } catch (e) {
+              uploadErrors.push(`foto ${i + 1}: ${e?.response?.data?.message || e.message}`);
+            }
+          }
+        }
+      }
+
+      if (uploadErrors.length > 0) {
+        setSubmitError(`Ficha creada, pero hubo errores al subir algunas fotos: ${uploadErrors.join('; ')}`);
+        setSubmitSuccess(true);
+      } else {
+        setSubmitSuccess(true);
+      }
+
       setTimeout(() => {
         navigate("/dashboard/caracterizacion-pesca");
-      }, 2000);
+      }, 3000);
     } catch (err) {
       setSubmitError(err.message || "Ocurrió un error al guardar la ficha");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const addFoto = () => {
+    setAnexoFotos([...anexoFotos, { file: null, observaciones: "" }]);
+  };
+
+  const removeFoto = (index) => {
+    setAnexoFotos(anexoFotos.filter((_, i) => i !== index));
+  };
+
+  const handleFileChange = (index, file) => {
+    const updatedFotos = [...anexoFotos];
+    updatedFotos[index].file = file;
+    setAnexoFotos(updatedFotos);
+  };
+
+  const handleObsChange = (index, obs) => {
+    const updatedFotos = [...anexoFotos];
+    updatedFotos[index].observaciones = obs;
+    setAnexoFotos(updatedFotos);
   };
 
   return (
@@ -665,7 +710,7 @@ export default function FormCaraterizacionPescaPage() {
                       <FormControlLabel
                         value="poco"
                         control={<Radio />}
-                        label="Poco (&lt;20 kg)"
+                        label="Poco (<20 kg)"
                       />
                       <FormControlLabel
                         value="medio"
@@ -675,7 +720,7 @@ export default function FormCaraterizacionPescaPage() {
                       <FormControlLabel
                         value="alto"
                         control={<Radio />}
-                        label="Alto (&gt;50 kg)"
+                        label="Alto (>50 kg)"
                       />
                     </RadioGroup>
                   )}
@@ -1161,6 +1206,70 @@ export default function FormCaraterizacionPescaPage() {
                 )}
               </Box>
             </Grid>
+          </Grid>
+
+          {/* SECCIÓN 9: ANEXOS FOTOGRÁFICOS */}
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}
+          >
+            9. ANEXOS FOTOGRÁFICOS
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="body2" color="textSecondary">
+              Cargue las fotografías que sirvan como evidencia de la caracterización.
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddPhotoIcon />}
+              onClick={addFoto}
+              size="small"
+              color="success"
+            >
+              Agregar Foto
+            </Button>
+          </Box>
+
+          <Grid container spacing={3}>
+            {anexoFotos.map((foto, index) => (
+              <Grid item xs={12} md={6} key={index}>
+                <Paper variant="outlined" sx={{ p: 2, position: 'relative', bgcolor: '#f9f9f9' }}>
+                  <IconButton
+                    onClick={() => removeFoto(index)}
+                    sx={{ position: 'absolute', top: 5, right: 5, color: 'error.main' }}
+                    size="small"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Typography variant="subtitle2">Foto {index + 1}</Typography>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      fullWidth
+                      startIcon={<AddPhotoIcon />}
+                    >
+                      {foto.file ? foto.file.name : "Seleccionar imagen"}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(index, e.target.files[0])}
+                      />
+                    </Button>
+                    <TextField
+                      label="Observaciones"
+                      fullWidth
+                      size="small"
+                      value={foto.observaciones}
+                      onChange={(e) => handleObsChange(index, e.target.value)}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+            ))}
           </Grid>
 
           {/* BOTONES DE ACCIÓN */}
