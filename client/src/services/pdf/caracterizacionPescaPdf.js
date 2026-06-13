@@ -277,7 +277,8 @@ export const downloadCaracterizacionPescaPdf = async (data, filename) => {
   try {
     const hydrated = await hydrateAssets(data);
     const doc = generateCaracterizacionPescaPdf(hydrated);
-    const blobUrl = doc.doc.output('bloburl');
+    const blob = doc.getBlob();
+    const blobUrl = URL.createObjectURL(blob);
 
     if (previewWindow && !previewWindow.closed) {
       previewWindow.location.href = blobUrl;
