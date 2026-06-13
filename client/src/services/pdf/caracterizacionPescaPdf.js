@@ -26,9 +26,9 @@ const hydrateAssets = async (data) => {
   if (anexoFotos.length) {
     out._anexoFotosDataUrls = await Promise.all(
       anexoFotos.map(async (foto) => {
-        const url = foto?.imagen;
+        const url = foto?.url;
         if (!url) return null;
-        if (url.startsWith('data:')) return url;
+        //if (url.startsWith('data:')) return url;
         try {
           return await fetchAsDataUrl(resolveStaticUrl(url));
         } catch (err) {
@@ -247,7 +247,7 @@ export const generateCaracterizacionPescaPdf = (data) => {
       
       for (let i = 0; i < fotos.length; i++) {
         const anexo = fotos[i];
-        const dataUrl = data.anexoFotografico?.fotos[i].url;
+        const dataUrl = data._anexoFotosDataUrls?.[i];
         
         if (dataUrl) {
           doc.addImage(dataUrl, { 
