@@ -274,18 +274,17 @@ export const downloadCaracterizacionPescaPdf = async (data, filename) => {
 
   const previewWindow = window.open('', '_blank');
 
-  try {
-    const hydrated = await hydrateAssets(data);
-    const doc = generateCaracterizacionPescaPdf(hydrated);
-    const blob = doc.getBlob();
-    const blobUrl = URL.createObjectURL(blob);
+    try {
+      const hydrated = await hydrateAssets(data);
+      const doc = generateCaracterizacionPescaPdf(hydrated);
+      const blobUrl = doc.doc.output('bloburl');
 
-    if (previewWindow && !previewWindow.closed) {
-      previewWindow.location.href = blobUrl;
-    } else {
-      doc.save(name);
-    }
-  } catch (err) {
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = blobUrl;
+      } else {
+        doc.save(name);
+      }
+    } catch (err) {
     if (previewWindow && !previewWindow.closed) previewWindow.close();
     throw err;
   }
