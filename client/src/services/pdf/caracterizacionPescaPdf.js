@@ -201,12 +201,13 @@ export const generateCaracterizacionPescaPdf = async (data) => {
     doc.spacer(10);
 
     // SECCIÓN 9: ANEXOS FOTOGRÁFICOS
-    if (data.anexosFotograficos && data.anexosFotograficos.length > 0) {
+    if (data.anexoFotografico && data.anexoFotografico.fotos.length > 0) {
+
       doc.sectionHeader("9. ANEXOS FOTOGRÁFICOS");
       doc.spacer(5);
       
-      for (let i = 0; i < data.anexosFotograficos.length; i++) {
-        const anexo = data.anexosFotograficos[i];
+      for (let i = 0; i < data.anexoFotografico.fotos.length; i++) {
+        const anexo = data.anexoFotografico.fotos[i];
         if (anexo.imagen) {
           doc.addImage(anexo.imagen, { 
             caption: `Foto ${i + 1}: ${anexo.observaciones || 'Sin observaciones'}` 
