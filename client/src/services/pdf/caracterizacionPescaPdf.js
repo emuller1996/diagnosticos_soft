@@ -244,21 +244,74 @@ export const generateCaracterizacionPescaPdf = (data) => {
     if (fotos.length > 0) {
       doc.sectionHeader("9. ANEXOS FOTOGRÁFICOS");
       doc.spacer(5);
-      
-      for (let i = 0; i < fotos.length; i++) {
-        const anexo = fotos[i];
-        const dataUrl = data._anexoFotosDataUrls?.[i];
-        
-        if (dataUrl) {
-          doc.addImage(dataUrl, { 
-            caption: `Foto ${i + 1}: ${anexo.observaciones || 'Sin observaciones'}` 
-          });
-          doc.spacer(10);
-        } else {
-          doc.subtitle(`Foto ${i + 1}: [Imagen no disponible]`, { size: 8, color: [150, 0, 0] });
-          doc.subtitle(`Obs: ${anexo.observaciones || 'Sin observaciones'}`, { size: 8 });
-          doc.spacer(5);
+
+      const dataUrls = data._anexoFotosDataUrls || [];
+      const gap = 4;
+      const colW = (doc.contentWidth - gap) / 2;
+      const imgH = 55; // altura del área de imagen
+      const headerBarH = 6;
+      const obsBoxH = 16;
+      const blockH = headerBarH + imgH + obsBoxH + 4; // alto total de cada foto
+
+      for (let i = 0; i < fotos.length; i += 2) {
+        doc.ensureSpace(blockH);
+        const rowY = doc.cursorY;
+
+        for (let col = 0; col < 2; col++) {
+          const idx = i + col;
+          if (idx >= fotos.length) break;
+          const foto = fotos[idx];
+          const dataUrl = dataUrls[idx];
+          const x = doc.marginX + col * (colW + gap);
+
+          // Header "FOTOGRAFÍA N"
+          doc.doc.setFillColor(...doc.config.headerFill);
+          doc.doc.rect(x, rowY, colW, headerBarH, 'F');
+          doc.doc.setTextColor(...doc.config.headerText);
+          doc.doc.setFont('helvetica', 'bold');
+          doc.doc.setFontSize(8);
+          doc.doc.text(`FOTOGRAFÍA ${idx + 1}`, x + 2, rowY + 4.2);
+          doc.doc.setTextColor(0);
+
+          // Imagen
+          const imgY = rowY + headerBarH;
+          doc.doc.setDrawColor(180);
+          doc.doc.setLineWidth(0.2);
+          doc.doc.rect(x, imgY, colW, imgH);
+
+          if (dataUrl) {
+            try {
+              const props = doc.doc.getImageProperties(dataUrl);
+              const aspect = props.width / props.height;
+              let drawW = colW - 2;
+              let drawH = drawW / aspect;
+              if (drawH > imgH - 2) {
+                drawH = imgH - 2;
+                drawW = drawH * aspect;
+              }
+              const dx = x + (colW - drawW) / 2;
+              const dy = imgY + (imgH - drawH) / 2;
+              doc.doc.addImage(dataUrl, 'WEBP', dx, dy, drawW, drawH);
+            } catch (err) {
+              console.warn('No se pudo embeber la foto en el PDF de pesca:', err);
+            }
+          }
+
+          // Recuadro de observaciones
+          const obsY = imgY + imgH;
+          doc.doc.setFont('helvetica', 'bold');
+          doc.doc.setFontSize(7);
+          doc.doc.text('OBSERVACIONES:', x + 1, obsY + 3);
+          doc.doc.setDrawColor(180);
+          doc.doc.rect(x, obsY, colW, obsBoxH);
+          doc.doc.setFont('helvetica', 'normal');
+          doc.doc.setFontSize(8);
+          const obsText = String(foto?.observaciones || '');
+          const wrapped = doc.doc.splitTextToSize(obsText, colW - 2);
+          doc.doc.text(wrapped, x + 1, obsY + 7);
         }
+
+        doc.cursorY = rowY + blockH;
       }
     }
 
