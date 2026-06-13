@@ -1,9 +1,50 @@
 import PdfDocument from "./PdfDocument";
+import { resolveStaticUrl } from '../apiClient';
 
 /**
- * Servicio para generar el PDF de Caracterización de Pesca
+ * Helper para convertir una URL de imagen en DataURL (Base64)
  */
-export const generateCaracterizacionPescaPdf = async (data) => {
+const fetchAsDataUrl = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Status ${response.status}`);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+};
+
+/**
+ * Carga las imágenes de los anexos y las convierte a DataURL
+ */
+const hydrateAssets = async (data) => {
+  const out = { ...data };
+  const anexoFotos = data?.anexoFotografico?.fotos || [];
+  
+  if (anexoFotos.length) {
+    out._anexoFotosDataUrls = await Promise.all(
+      anexoFotos.map(async (foto) => {
+        const url = foto?.imagen;
+        if (!url) return null;
+        if (url.startsWith('data:')) return url;
+        try {
+          return await fetchAsDataUrl(resolveStaticUrl(url));
+        } catch (err) {
+          console.warn('No se pudo cargar una foto del anexo para el PDF:', err);
+          return null;
+        }
+      })
+    );
+  }
+  return out;
+};
+
+/**
+ * Genera el contenido del PDF de Caracterización de Pesca
+ */
+export const generateCaracterizacionPescaPdf = (data) => {
   const doc = new PdfDocument();
 
   // 1. ENCABEZADO
@@ -15,7 +56,6 @@ export const generateCaracterizacionPescaPdf = async (data) => {
   // SECCIÓN 1: IDENTIFICACIÓN
   doc.sectionHeader("1. IDENTIFICACIÓN");
   
-  // Agrupamos los campos en filas de 2 para aprovechar la función fieldRow
   doc.fieldRow([
     { label: "Nombre del Pescador:", value: data.nombrePescador },
     { label: "Documento:", value: data.documento },
@@ -37,7 +77,6 @@ export const generateCaracterizacionPescaPdf = async (data) => {
   doc.subtitle(`Total de personas dependientes: ${data.totalPersonas || 0}`, { size: 10, color: [0, 0, 0] });
   doc.spacer(5);
 
-  // Tabla de composición
   const columns = ["Categoría", "Cantidad"];
   const rows = [
     ["Niños (0-12 años)", data.ninios || 0],
@@ -201,21 +240,52 @@ export const generateCaracterizacionPescaPdf = async (data) => {
     doc.spacer(10);
 
     // SECCIÓN 9: ANEXOS FOTOGRÁFICOS
-    if (data.anexoFotografico && data.anexoFotografico.fotos.length > 0) {
-
+    const fotos = data.anexoFotografico?.fotos || [];
+    if (fotos.length > 0) {
       doc.sectionHeader("9. ANEXOS FOTOGRÁFICOS");
       doc.spacer(5);
       
-      for (let i = 0; i < data.anexoFotografico.fotos.length; i++) {
-        const anexo = data.anexoFotografico.fotos[i];
-        if (anexo.imagen) {
-          doc.addImage(anexo.imagen, { 
+      for (let i = 0; i < fotos.length; i++) {
+        const anexo = fotos[i];
+        const dataUrl = data._anexoFotosDataUrls?.[i];
+        
+        if (dataUrl) {
+          doc.addImage(dataUrl, { 
             caption: `Foto ${i + 1}: ${anexo.observaciones || 'Sin observaciones'}` 
           });
           doc.spacer(10);
+        } else {
+          doc.subtitle(`Foto ${i + 1}: [Imagen no disponible]`, { size: 8, color: [150, 0, 0] });
+          doc.subtitle(`Obs: ${anexo.observaciones || 'Sin observaciones'}`, { size: 8 });
+          doc.spacer(5);
         }
       }
     }
 
-    return await doc.getBlob();
+    return doc;
+};
+
+/**
+ * Función principal para descargar el PDF
+ */
+export const downloadCaracterizacionPescaPdf = async (data, filename) => {
+  const id = data?.id || 'documento';
+  const name = filename || `caracterizacion-pesca-${id}.pdf`;
+
+  const previewWindow = window.open('', '_blank');
+
+  try {
+    const hydrated = await hydrateAssets(data);
+    const doc = generateCaracterizacionPescaPdf(hydrated);
+    const blobUrl = doc.doc.output('bloburl');
+
+    if (previewWindow && !previewWindow.closed) {
+      previewWindow.location.href = blobUrl;
+    } else {
+      doc.save(name);
+    }
+  } catch (err) {
+    if (previewWindow && !previewWindow.closed) previewWindow.close();
+    throw err;
+  }
 };
