@@ -26,7 +26,7 @@ import {
 import { Add, Edit, Visibility, Delete, Refresh, PictureAsPdf, Search, Person, CalendarMonth } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../hooks/useCaracterizacionPesca";
-import { generateCaracterizacionPescaPdf } from "../../services/pdf/caracterizacionPescaPdf";
+import { downloadCaracterizacionPescaPdf } from "../../services/pdf/caracterizacionPescaPdf";
 
 export default function CaracterizacionPescaPage() {
   const navigate = useNavigate();
@@ -49,15 +49,7 @@ export default function CaracterizacionPescaPage() {
 
   const handleDownloadPdf = async (item) => {
     try {
-      const blob = await generateCaracterizacionPescaPdf(item);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `Caracterizacion_${item.nombrePescador || item.id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await downloadCaracterizacionPescaPdf(item);
     } catch (err) {
       console.error("Error generating PDF:", err);
       alert("Hubo un error al generar el PDF");
