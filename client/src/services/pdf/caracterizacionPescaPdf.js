@@ -247,7 +247,7 @@ export const generateCaracterizacionPescaPdf = (data) => {
       
       for (let i = 0; i < fotos.length; i++) {
         const anexo = fotos[i];
-        const dataUrl = data._anexoFotosDataUrls?.[i];
+        const dataUrl = data.anexoFotografico?.fotos[i].url;
         
         if (dataUrl) {
           doc.addImage(dataUrl, { 
