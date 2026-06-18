@@ -1,4 +1,5 @@
 import client from '../config/elastic.js';
+import bcrypt from 'bcrypt';
 
 const INDEX_NAME = process.env.INDEX_ELASTIC;
 
@@ -11,13 +12,21 @@ const userService = {
         throw new Error('User already exists');
       }
 
+      // Hash password before saving
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
+
+      const userToSave = {
+        ...userData,
+        password: hashedPassword,
+        createdAt: new Date(),
+        type: "user"
+      };
+
       const result = await client.index({
         index: INDEX_NAME,
         id: userData.email, // Use email as document ID
-        document: {
-          ...userData,
-          createdAt: new Date(),
-        },
+        document: userToSave,
       });
 
       return result;
@@ -37,6 +46,47 @@ const userService = {
       if (error.meta && error.meta.statusCode === 404) {
         return null;
       }
+      throw error;
+    }
+  },
+
+  async findUsers({ page = 1, limit = 10, search = '' }) {
+    try {
+      const from = (page - 1) * limit;
+      
+      const query = {
+        bool: {
+          filter: [
+            { term: { type: 'user' } }
+          ]
+        }
+      };
+
+      if (search) {
+        query.bool.must = [
+          {
+            multi_match: {
+              query: search,
+              fields: ['name', 'email'],
+              fuzziness: 'AUTO'
+            }
+          }
+        ];
+      }
+
+      const result = await client.search({
+        index: INDEX_NAME,
+        from,
+        size: limit,
+        query
+      });
+      
+
+      return {
+        total: result.hits.total.value,
+        users: result.hits.hits.map(hit => hit._source)
+      };
+    } catch (error) {
       throw error;
     }
   }
