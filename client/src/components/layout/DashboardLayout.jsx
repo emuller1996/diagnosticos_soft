@@ -21,7 +21,8 @@ import {
   Assignment as ProjectIcon, 
   Menu as MenuIcon, 
   Logout as LogoutIcon,
-  Phishing
+  Phishing,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import DataExplorationIcon from '@mui/icons-material/DataExploration';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
@@ -48,6 +49,11 @@ const MENU_ITEMS = [
     text: 'Caracterizacion Pesca', 
     icon: <Phishing />, 
     path: '/dashboard/caracterizacion-pesca' 
+  },
+  { 
+    text: 'Usuarios', 
+    icon: <PeopleIcon />, 
+    path: '/dashboard/users' 
   },
 ];
 

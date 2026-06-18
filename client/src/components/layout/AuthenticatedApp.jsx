@@ -8,6 +8,7 @@ import DiagnosticosPage from '../../pages/diagnosticos/DiagnosticosPage';
 import NuevoDiagnosticoPage from '../../pages/diagnosticos/NuevoDiagnosticoPage';
 import CaracterizacionPescaPage from '../../pages/caracterizacion-pesca/CaracterizacionPescaPage';
 import FormCaraterizacionPescaPage from '../../pages/caracterizacion-pesca/nuevo/FormCaraterizacionPesca';
+import UsersPage from '../../pages/users/UsersPage';
 
 const AuthenticatedApp = () => {
   const { logout } = useAuth();
@@ -21,6 +22,7 @@ const AuthenticatedApp = () => {
         <Route path="/dashboard/diagnosticos/nuevo" element={<NuevoDiagnosticoPage />} />
         <Route path="/dashboard/caracterizacion-pesca" element={<CaracterizacionPescaPage />} />
         <Route path="/dashboard/caracterizacion-pesca/nuevo" element={<FormCaraterizacionPescaPage />} />
+        <Route path="/dashboard/users" element={<UsersPage />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
