@@ -63,16 +63,35 @@ const userService = {
       };
 
       if (search) {
-        query.bool.must = [
-          {
-            multi_match: {
-              query: search,
-              fields: ['name', 'email'],
-              fuzziness: 'AUTO'
-            }
+      // Normalizar búsqueda a minúsculas
+      const searchLower = search.toLowerCase();
+      
+      query.bool.must = [
+        {
+          bool: {
+            should: [
+              {
+                wildcard: {
+                  name: {
+                    value: `*${searchLower}*`,
+                    case_insensitive: true // Elasticsearch 7.10+
+                  }
+                }
+              },
+              {
+                wildcard: {
+                  email: {
+                    value: `*${searchLower}*`,
+                    case_insensitive: true
+                  }
+                }
+              }
+            ],
+            minimum_should_match: 1
           }
-        ];
-      }
+        }
+      ];
+    }
 
       const result = await client.search({
         index: INDEX_NAME,
