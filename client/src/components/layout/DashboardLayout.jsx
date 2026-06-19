@@ -40,11 +40,11 @@ const MENU_ITEMS = [
     icon: <ProjectIcon />, 
     path: '/dashboard/proyectos' 
   },
-  { 
+  /* { 
     text: 'Diagnosticos', 
     icon: <DataExplorationIcon />, 
     path: '/dashboard/diagnosticos' 
-  },
+  }, */
   { 
     text: 'Caracterizacion Pesca', 
     icon: <Phishing />, 
