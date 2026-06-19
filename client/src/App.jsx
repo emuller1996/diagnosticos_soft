@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { SyncStatus } from './components/SyncStatus';
+import { useSyncStatus } from './hooks/useSyncStatus';
 
 // We will implement these in the next steps
 import Login from './pages/Login';
@@ -28,11 +30,14 @@ const theme = createTheme({
 });
 
 function App() {
+  const { pendingCount, updatePendingCount } = useSyncStatus();
+
   return (
     <AuthProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-         <Routes>
+        <SyncStatus pendingCount={pendingCount} onSyncComplete={updatePendingCount} />
+          <Routes>
            <Route path="/login" element={<Login />} />
            <Route path="/register" element={<Register />} />
            <Route 
