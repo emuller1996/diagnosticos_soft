@@ -1,5 +1,5 @@
-import client from '../config/elastic.js';
-import bcrypt from 'bcrypt';
+import client from "../config/elastic.js";
+import bcrypt from "bcrypt";
 
 const INDEX_NAME = process.env.INDEX_ELASTIC;
 
@@ -7,9 +7,12 @@ const userService = {
   async createUser(userData) {
     try {
       // Check if user already exists by email/username
-      const { exists } = await client.exists({ index: INDEX_NAME, id: userData.email });
+      const { exists } = await client.exists({
+        index: INDEX_NAME,
+        id: userData.email,
+      });
       if (exists) {
-        throw new Error('User already exists');
+        throw new Error("User already exists");
       }
 
       // Hash password before saving
@@ -20,7 +23,7 @@ const userService = {
         ...userData,
         password: hashedPassword,
         createdAt: new Date(),
-        type: "user"
+        type: "user",
       };
 
       const result = await client.index({
@@ -50,65 +53,65 @@ const userService = {
     }
   },
 
-  async findUsers({ page = 1, limit = 10, search = '' }) {
+  async findUsers({ page = 1, limit = 10, search = "" }) {
     try {
       const from = (page - 1) * limit;
-      
+
       const query = {
         bool: {
-          filter: [
-            { term: { type: 'user' } }
-          ]
-        }
+          filter: [{ term: { type: "user" } }],
+        },
       };
 
       if (search) {
-      // Normalizar búsqueda a minúsculas
-      const searchLower = search.toLowerCase();
-      
-      query.bool.must = [
-        {
-          bool: {
-            should: [
-              {
-                wildcard: {
-                  name: {
-                    value: `*${searchLower}*`,
-                    case_insensitive: true // Elasticsearch 7.10+
-                  }
-                }
-              },
-              {
-                wildcard: {
-                  email: {
-                    value: `*${searchLower}*`,
-                    case_insensitive: true
-                  }
-                }
-              }
-            ],
-            minimum_should_match: 1
-          }
-        }
-      ];
-    }
+        // Normalizar búsqueda a minúsculas
+        const searchLower = search.toLowerCase();
+
+        query.bool.must = [
+          {
+            bool: {
+              should: [
+                {
+                  wildcard: {
+                    name: {
+                      value: `*${searchLower}*`,
+                      case_insensitive: true, // Elasticsearch 7.10+
+                    },
+                  },
+                },
+                {
+                  wildcard: {
+                    email: {
+                      value: `*${searchLower}*`,
+                      case_insensitive: true,
+                    },
+                  },
+                },
+              ],
+              minimum_should_match: 1,
+            },
+          },
+        ];
+      }
 
       const result = await client.search({
         index: INDEX_NAME,
         from,
         size: limit,
-        query
+        query,
+        _source: {
+          excludes: ["password", "passwordHash", "salt", "token"], // Campos a excluir
+        },
       });
-      
 
       return {
         total: result.hits.total.value,
-        users: result.hits.hits.map(hit => hit._source)
+        users: result.hits.hits.map((hit) => hit._source),
       };
     } catch (error) {
       throw error;
     }
-  }
+  },
 };
 
 export default userService;

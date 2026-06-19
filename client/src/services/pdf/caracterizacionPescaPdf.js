@@ -28,7 +28,6 @@ const hydrateAssets = async (data) => {
       anexoFotos.map(async (foto) => {
         const url = foto?.url;
         if (!url) return null;
-        //if (url.startsWith('data:')) return url;
         try {
           return await fetchAsDataUrl(resolveStaticUrl(url));
         } catch (err) {
@@ -314,6 +313,51 @@ export const generateCaracterizacionPescaPdf = (data) => {
         doc.cursorY = rowY + blockH;
       }
     }
+
+    // SECCIÓN DE FIRMAS
+    doc.spacer(15);
+    doc.sectionHeader("FIRMAS");
+    doc.spacer(10);
+
+    const sigW = 70;
+    const sigH = 30;
+    const gapSig = 20;
+    const startX = doc.marginX;
+
+    // Firma Titular
+    doc.doc.setFont('helvetica', 'bold');
+    doc.doc.setFontSize(9);
+    doc.doc.text("Firma del Titular:", startX, doc.cursorY);
+    
+    doc.doc.setDrawColor(180);
+    doc.doc.rect(startX, doc.cursorY + 2, sigW, sigH);
+    
+    if (data.firmaTitular) {
+      try {
+        doc.doc.addImage(data.firmaTitular, 'PNG', startX + 2, doc.cursorY + 4, sigW - 4, sigH - 4);
+      } catch (e) {
+        console.warn("Error al añadir firma titular al PDF:", e);
+      }
+    }
+
+    // Firma Profesional
+    const profX = startX + sigW + gapSig;
+    doc.doc.setFont('helvetica', 'bold');
+    doc.doc.setFontSize(9);
+    doc.doc.text("Firma del Profesional:", profX, doc.cursorY);
+    
+    doc.doc.setDrawColor(180);
+    doc.doc.rect(profX, doc.cursorY + 2, sigW, sigH);
+    
+    if (data.firmaProfesional) {
+      try {
+        doc.doc.addImage(data.firmaProfesional, 'PNG', profX + 2, doc.cursorY + 4, sigW - 4, sigH - 4);
+      } catch (e) {
+        console.warn("Error al añadir firma profesional al PDF:", e);
+      }
+    }
+
+    doc.cursorY += sigH + 15;
 
     return doc;
 };

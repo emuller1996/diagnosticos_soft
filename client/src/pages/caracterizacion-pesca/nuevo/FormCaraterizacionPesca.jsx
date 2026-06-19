@@ -20,6 +20,7 @@ import {
 import { Delete as DeleteIcon, AddPhotoAlternate as AddPhotoIcon } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
+import SignatureDialog from "../../../components/diagnosticos/SignatureDialog";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../../hooks/useCaracterizacionPesca";
 import { uploadService } from "../../../services/uploadService";
@@ -78,8 +79,10 @@ export default function FormCaraterizacionPescaPage() {
       otroMedioTransporte: "",
       otroProblema: "",
       // NUEVOS CAMPOS - SECCIÓN 8
-      necesidadesPrioritarias: [],
-    },
+        necesidadesPrioritarias: [],
+        firmaTitular: "",
+        firmaProfesional: "",
+      },
   });
 
   const totalPersonas = watch("totalPersonas");
@@ -152,6 +155,25 @@ export default function FormCaraterizacionPescaPage() {
     const updatedFotos = [...anexoFotos];
     updatedFotos[index].observaciones = obs;
     setAnexoFotos(updatedFotos);
+  };
+
+  const [signatureDialog, setSignatureDialog] = useState({ open: false, target: null });
+
+  const openSignatureDialog = (target) => {
+    setSignatureDialog({ open: true, target });
+  };
+
+  const closeSignatureDialog = () => {
+    setSignatureDialog({ open: false, target: null });
+  };
+
+  const handleSignatureSave = (base64Image) => {
+    if (signatureDialog.target === "titular") {
+      setValue("firmaTitular", base64Image);
+    } else if (signatureDialog.target === "profesional") {
+      setValue("firmaProfesional", base64Image);
+    }
+    closeSignatureDialog();
   };
 
   return (
@@ -1272,6 +1294,90 @@ export default function FormCaraterizacionPescaPage() {
             ))}
           </Grid>
 
+          {/* FIRMAS */}
+          <Box sx={{ mt: 6, p: 3, border: "1px solid #ddd", borderRadius: 2, bgcolor: "#fafafa" }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: "#2E7D32" }}>
+              FIRMAS
+            </Typography>
+            <Grid container spacing={4} alignItems="center">
+              <Grid item xs={12} md={6} display="flex" flexDirection="column" alignItems="center">
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                  Firma del Titular
+                </Typography>
+                <Box
+                  sx={{
+                    width: 300,
+                    height: 150,
+                    border: "2px dashed #ccc",
+                    borderRadius: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "white",
+                    cursor: "pointer",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                  onClick={() => openSignatureDialog("titular")}
+                >
+                  {watch("firmaTitular") ? (
+                    <img src={watch("firmaTitular")} alt="Firma Titular" style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      Haga clic para firmar
+                    </Typography>
+                  )}
+                </Box>
+                <Button
+                  size="small"
+                  sx={{ mt: 1 }}
+                  onClick={() => setValue("firmaTitular", "")}
+                  disabled={!watch("firmaTitular")}
+                >
+                  Borrar Firma
+                </Button>
+              </Grid>
+
+              <Grid item xs={12} md={6} display="flex" flexDirection="column" alignItems="center">
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                  Firma del Profesional
+                </Typography>
+                <Box
+                  sx={{
+                    width: 300,
+                    height: 150,
+                    border: "2px dashed #ccc",
+                    borderRadius: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "white",
+                    cursor: "pointer",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                  onClick={() => openSignatureDialog("profesional")}
+                >
+                  {watch("firmaProfesional") ? (
+                    <img src={watch("firmaProfesional")} alt="Firma Profesional" style={{ maxWidth: "100%", maxHeight: "100%" }} />
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      Haga clic para firmar
+                    </Typography>
+                  )}
+                </Box>
+                <Button
+                  size="small"
+                  sx={{ mt: 1 }}
+                  onClick={() => setValue("firmaProfesional", "")}
+                  disabled={!watch("firmaProfesional")}
+                >
+                  Borrar Firma
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+
           {/* BOTONES DE ACCIÓN */}
           <Box
             sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 4 }}
@@ -1298,6 +1404,11 @@ export default function FormCaraterizacionPescaPage() {
           </Box>
         </Paper>
       </form>
+      <SignatureDialog
+        open={signatureDialog.open}
+        onClose={closeSignatureDialog}
+        onSave={handleSignatureSave}
+      />
     </Box>
   );
 }
