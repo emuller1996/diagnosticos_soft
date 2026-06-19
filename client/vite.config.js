@@ -7,26 +7,31 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['favicon.ico'],
       manifest: {
         name: 'Diagnósticos Soft',
         short_name: 'DiagSoft',
         description: 'Software de gestión de diagnósticos',
+        lang: 'es',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
         theme_color: '#ffffff',
+        background_color: '#ffffff',
         icons: [
           {
             src: 'pwa-192x192.png',
-            size: '192x192',
+            sizes: '192x192',
             type: 'image/png'
           },
           {
             src: 'pwa-512x512.png',
-            size: '512x512',
+            sizes: '512x512',
             type: 'image/png'
           },
           {
             src: 'pwa-512x512.png',
-            size: '512x512',
+            sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
           }
