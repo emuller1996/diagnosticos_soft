@@ -32,6 +32,7 @@ export default function FormCaraterizacionPescaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitOffline, setSubmitOffline] = useState(false);
   const [anexoFotos, setAnexoFotos] = useState([]);
 
   const {
@@ -101,9 +102,23 @@ export default function FormCaraterizacionPescaPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(false);
+    setSubmitOffline(false);
 
     try {
-      const created = await createCaracterizacion(data);
+      const created = await createCaracterizacion(data, anexoFotos);
+
+      // Guardado sin conexión: la ficha y las fotos quedaron encoladas y se
+      // enviarán automáticamente al recuperar internet.
+      if (created?.isPending) {
+        setSubmitError(null);
+        setSubmitSuccess(true);
+        setSubmitOffline(true);
+        setTimeout(() => {
+          navigate("/dashboard/caracterizacion-pesca");
+        }, 3000);
+        return;
+      }
+
       const id = created?.id;
       const uploadErrors = [];
 
@@ -194,8 +209,10 @@ export default function FormCaraterizacionPescaPage() {
       )}
 
       {submitSuccess && (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          ¡Ficha guardada exitosamente! Redirigiendo...
+        <Alert severity={submitOffline ? "info" : "success"} sx={{ mb: 3 }}>
+          {submitOffline
+            ? "Ficha guardada sin conexión. Se enviará automáticamente cuando vuelva el internet. Redirigiendo..."
+            : "¡Ficha guardada exitosamente! Redirigiendo..."}
         </Alert>
       )}
 

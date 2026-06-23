@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { caracterizacionPescaService } from '../services/caracterizacionPescaService';
 import { offlineStore } from '../db/offlineDb';
+import { authService } from '../services/authService';
 
 export const useCaracterizacionPesca = () => {
   const [data, setData] = useState([]);
@@ -32,20 +33,34 @@ export const useCaracterizacionPesca = () => {
     updatePendingCount();
   }, [fetchCaracterizaciones]);
 
-  const createCaracterizacion = async (payload) => {
+  const normalizePhotos = (photos = []) =>
+    photos
+      .filter((p) => p && p.file)
+      .map(({ file, observaciones }) => ({
+        blob: file,
+        name: file.name,
+        type: file.type,
+        observaciones: observaciones || ''
+      }));
+
+  const createCaracterizacion = async (payload, photos = []) => {
     try {
       if (!navigator.onLine) {
-        await offlineStore.addToQueue('CREATE', payload, '/caracterizacion-pesca');
+        await offlineStore.addToQueue('CREATE', payload, '/caracterizacion-pesca', normalizePhotos(photos));
         await updatePendingCount();
         return { ...payload, isPending: true };
       }
 
-      const newRecord = await caracterizacionPescaService.create(payload);
+      // Con sesión activa, atribuir la ficha al usuario que la registra.
+      const registradoPor = authService.getUser()?.email || null;
+      const newRecord = await caracterizacionPescaService.create(
+        registradoPor ? { ...payload, registradoPor } : payload
+      );
       await fetchCaracterizaciones();
       return newRecord;
     } catch (err) {
       if (!navigator.onLine || !err.response) {
-        await offlineStore.addToQueue('CREATE', payload, '/caracterizacion-pesca');
+        await offlineStore.addToQueue('CREATE', payload, '/caracterizacion-pesca', normalizePhotos(photos));
         await updatePendingCount();
         return { ...payload, isPending: true };
       }
