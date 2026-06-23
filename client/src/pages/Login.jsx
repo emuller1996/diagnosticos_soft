@@ -8,9 +8,10 @@ import {
   Paper, 
   Container, 
   Alert,
-  InputAdornment 
+  InputAdornment,
+  Divider
 } from '@mui/material';
-import { Email, Lock } from '@mui/icons-material';
+import { Email, Lock, Phishing } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -124,6 +125,22 @@ const Login = () => {
               </Typography>
             </Box>
           </Box>
+
+          <Divider sx={{ my: 3 }}>o</Divider>
+
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            startIcon={<Phishing />}
+            onClick={() => navigate('/dashboard/caracterizacion-pesca/nuevo')}
+            sx={{ py: 1.5, fontWeight: 'bold' }}
+          >
+            Llenar caracterización de pesca
+          </Button>
+          <Typography variant="caption" color="textSecondary" display="block" textAlign="center" mt={1}>
+            Puede llenar la ficha sin conexión. Se enviará al iniciar sesión.
+          </Typography>
         </Paper>
       </Box>
     </Container>
