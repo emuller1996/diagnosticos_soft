@@ -72,6 +72,21 @@ export default function CaracterizacionPescaPage() {
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
+      <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={() => navigate("/dashboard/caracterizacion-pesca/nuevo")}
+          sx={{ 
+            px: 3, 
+            py: 1.5, 
+            borderRadius: 2,
+            mt:3, 
+            fontWeight: 600, 
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
+          }}
+        >
+          Nueva Ficha
+        </Button>
         <Alert
           severity="error"
           action={

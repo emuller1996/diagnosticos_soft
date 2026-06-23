@@ -7,14 +7,23 @@ db.version(1).stores({
   syncQueue: '++id, type, timestamp' 
 });
 
+const notifyQueueChanged = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('offline-queue-changed'));
+  }
+};
+
 export const offlineStore = {
-  async addToQueue(type, payload, endpoint) {
-    return await db.syncQueue.add({
+  async addToQueue(type, payload, endpoint, photos = []) {
+    const id = await db.syncQueue.add({
       type,
       payload,
       endpoint,
+      photos,
       timestamp: Date.now()
     });
+    notifyQueueChanged();
+    return id;
   },
 
   async getAllPending() {
@@ -22,11 +31,15 @@ export const offlineStore = {
   },
 
   async removeFromQueue(id) {
-    return await db.syncQueue.delete(id);
+    const result = await db.syncQueue.delete(id);
+    notifyQueueChanged();
+    return result;
   },
 
   async clearQueue() {
-    return await db.syncQueue.clear();
+    const result = await db.syncQueue.clear();
+    notifyQueueChanged();
+    return result;
   },
 
   async getQueueCount() {

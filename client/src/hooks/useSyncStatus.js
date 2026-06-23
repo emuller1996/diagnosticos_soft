@@ -17,10 +17,14 @@ export const useSyncStatus = () => {
     
     // Also update when connection changes
     window.addEventListener('online', updatePendingCount);
-    
+
+    // Update immediately when the offline queue changes (enqueue / sync).
+    window.addEventListener('offline-queue-changed', updatePendingCount);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('online', updatePendingCount);
+      window.removeEventListener('offline-queue-changed', updatePendingCount);
     };
   }, []);
 

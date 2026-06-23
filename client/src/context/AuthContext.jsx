@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import apiClient from '../services/apiClient';
 import { authService, isTokenExpired, getTokenExpirationMs } from '../services/authService';
+import { syncService } from '../services/syncService';
 
 const AuthContext = createContext();
 
@@ -74,6 +75,8 @@ export const AuthProvider = ({ children }) => {
     const data = await authService.login(email, password);
     setToken(data.token);
     setUser(data.user);
+    // Apenas hay sesión, enviar las fichas guardadas offline (ya atribuibles).
+    syncService.syncIfPending();
   };
 
   return (

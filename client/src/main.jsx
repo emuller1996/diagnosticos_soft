@@ -7,6 +7,7 @@ import { syncService } from './services/syncService'
 
 registerPWA();
 syncService.initAutoSync();
+syncService.syncIfPending();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
