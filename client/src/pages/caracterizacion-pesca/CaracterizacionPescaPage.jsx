@@ -23,7 +23,17 @@ import {
   Avatar,
   Chip,
 } from "@mui/material";
-import { Add, Edit, Visibility, Delete, Refresh, PictureAsPdf, Search, Person, CalendarMonth } from "@mui/icons-material";
+import {
+  Add,
+  Edit,
+  Visibility,
+  Delete,
+  Refresh,
+  PictureAsPdf,
+  Search,
+  Person,
+  CalendarMonth,
+} from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../hooks/useCaracterizacionPesca";
 import { downloadCaracterizacionPescaPdf } from "../../services/pdf/caracterizacionPescaPdf";
@@ -43,7 +53,7 @@ export default function CaracterizacionPescaPage() {
       (item) =>
         item.nombrePescador?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.comunidad?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.comunidad?.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [data, searchTerm]);
 
@@ -72,17 +82,17 @@ export default function CaracterizacionPescaPage() {
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
-      <Button
+        <Button
           variant="contained"
           startIcon={<Add />}
           onClick={() => navigate("/dashboard/caracterizacion-pesca/nuevo")}
-          sx={{ 
-            px: 3, 
-            py: 1.5, 
+          sx={{
+            px: 3,
+            py: 1.5,
             borderRadius: 2,
-            mt:3, 
-            fontWeight: 600, 
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
+            mt: 3,
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
           }}
         >
           Nueva Ficha
@@ -118,7 +128,7 @@ export default function CaracterizacionPescaPage() {
         flexDirection={{ xs: "column", sm: "row" }}
         gap={2}
         textAlign={{ xs: "center", sm: "left" }}
-        sx={{mb:2}}
+        sx={{ mb: 2 }}
       >
         <Box>
           <Typography
@@ -138,13 +148,13 @@ export default function CaracterizacionPescaPage() {
           variant="contained"
           startIcon={<Add />}
           onClick={() => navigate("/dashboard/caracterizacion-pesca/nuevo")}
-          sx={{ 
-            px: 3, 
-            py: 1.5, 
+          sx={{
+            px: 3,
+            py: 1.5,
             borderRadius: 2,
-            mt:3, 
-            fontWeight: 600, 
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
+            mt: 3,
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
           }}
         >
           Nueva Ficha
@@ -167,10 +177,10 @@ export default function CaracterizacionPescaPage() {
                 </InputAdornment>
               ),
             }}
-            sx={{ 
-              backgroundColor: 'white',
+            sx={{
+              backgroundColor: "white",
               borderRadius: 2,
-              '& .MuiOutlinedInput-root': { borderRadius: 2 }
+              "& .MuiOutlinedInput-root": { borderRadius: 2 },
             }}
           />
         </Box>
@@ -201,64 +211,98 @@ export default function CaracterizacionPescaPage() {
               sx={{ borderRadius: 3, boxShadow: 2 }}
             >
               <Table>
-            <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700, py: 2 }}>Pescador</TableCell>
-                <TableCell sx={{ fontWeight: 700, py: 2 }}>Documento</TableCell>
-                <TableCell sx={{ fontWeight: 700, py: 2 }}>Comunidad</TableCell>
-                <TableCell sx={{ fontWeight: 700, py: 2 }}>Fecha</TableCell>
-                <TableCell sx={{ fontWeight: 700, py: 2 }} align="right">Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredData.map((item) => (
-                <TableRow key={item.id} hover>
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={1.5}>
-                      <Avatar sx={{ width: 32, height: 32, fontSize: '0.8rem', bgcolor: theme.palette.primary.main }}>
-                        {item.nombrePescador ? item.nombrePescador[0].toUpperCase() : 'P'}
-                      </Avatar>
-                      <Typography fontWeight="medium">{item.nombrePescador || item.id}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{item.documento || "N/A"}</TableCell>
-                  <TableCell>{item.comunidad || "N/A"}</TableCell>
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={0.5} color="text.secondary">
-                      <CalendarMonth sx={{ fontSize: 14 }} />
-                      {item.createdAt || item.fecha
-                        ? new Date(item.createdAt || item.fecha).toLocaleDateString()
-                        : "N/A"}
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Box display="flex" justifyContent="flex-end" gap={1}>
-                      <IconButton
-                        color="primary"
-                        onClick={() => navigate(`/dashboard/caracterizacion-pesca/ver/${item.id}`)}
-                        title="Ver detalle"
-                      >
-                        <Visibility fontSize="small" />
-                      </IconButton>
-                       <IconButton
-                         color="secondary"
-                         onClick={() => navigate(`/dashboard/caracterizacion-pesca/editar/${item.id}`)}
-                         title="Editar"
-                       >
-                         <Edit fontSize="small" />
-                       </IconButton>
-                        <IconButton
-                          color="info"
-                          onClick={() => handleDownloadPdf(item)}
-                          title="Descargar PDF"
-                        >
-                          <PictureAsPdf fontSize="small" />
-                        </IconButton>
-                      </Box>
+                <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, py: 2 }}>
+                      Pescador
                     </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+                    <TableCell sx={{ fontWeight: 700, py: 2 }}>
+                      Documento
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, py: 2 }}>
+                      Comunidad
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, py: 2 }}>Fecha</TableCell>
+                    <TableCell sx={{ fontWeight: 700, py: 2 }} align="right">
+                      Acciones
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredData.map((item) => (
+                    <TableRow key={item.id} hover>
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                          <Avatar
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              fontSize: "0.8rem",
+                              bgcolor: theme.palette.primary.main,
+                            }}
+                          >
+                            {item.nombrePescador
+                              ? item.nombrePescador[0].toUpperCase()
+                              : "P"}
+                          </Avatar>
+                          <Typography fontWeight="medium">
+                            {item.nombrePescador || item.id}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>{item.documento || "N/A"}</TableCell>
+                      <TableCell>{item.comunidad || "N/A"}</TableCell>
+                      <TableCell>
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          gap={0.5}
+                          color="text.secondary"
+                        >
+                          <CalendarMonth sx={{ fontSize: 14 }} />
+                          {item.createdAt || item.fecha
+                            ? new Date(
+                                item.createdAt || item.fecha,
+                              ).toLocaleDateString()
+                            : "N/A"}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Box display="flex" justifyContent="flex-end" gap={1}>
+                          <IconButton
+                            color="primary"
+                            onClick={() =>
+                              navigate(
+                                `/dashboard/caracterizacion-pesca/ver/${item.id}`,
+                              )
+                            }
+                            title="Ver detalle"
+                          >
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            color="secondary"
+                            onClick={() =>
+                              navigate(
+                                `/dashboard/caracterizacion-pesca/editar/${item.id}`,
+                              )
+                            }
+                            title="Editar"
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            color="info"
+                            onClick={() => handleDownloadPdf(item)}
+                            title="Descargar PDF"
+                          >
+                            <PictureAsPdf fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             </TableContainer>
           ) : (
@@ -270,12 +314,12 @@ export default function CaracterizacionPescaPage() {
                     elevation={0}
                     sx={{
                       borderRadius: 3,
-                      border: '1px solid',
-                      borderColor: 'grey.200',
+                      border: "1px solid",
+                      borderColor: "grey.200",
                       transition: "0.3s",
-                      "&:hover": { 
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                        borderColor: 'primary.light'
+                      "&:hover": {
+                        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+                        borderColor: "primary.light",
                       },
                     }}
                   >
@@ -286,48 +330,70 @@ export default function CaracterizacionPescaPage() {
                         alignItems="flex-start"
                         mb={2}
                       >
-                         <Box display="flex" gap={2} alignItems="center">
-                            <Avatar sx={{ width: 48, height: 48, bgcolor: theme.palette.primary.main, fontWeight: 'bold' }}>
-                              {item.nombrePescador ? item.nombrePescador[0].toUpperCase() : 'P'}
-                            </Avatar>
-                            <Box>
-                              <Typography
-                                variant="subtitle1"
-                                fontWeight="bold"
-                                color="text.primary"
-                              >
-                                {item.nombrePescador || `Ficha #${item.id}`}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" display="block">
-                                Doc: {item.documento || "N/A"} | {item.comunidad || "S/C"}
-                              </Typography>
-                            </Box>
-                         </Box>
-                         <Box display="flex" gap={1}>
-                           <IconButton
-                             size="small"
-                             color="primary"
-                             onClick={() => navigate(`/dashboard/caracterizacion-pesca/ver/${item.id}`)}
-                           >
-                             <Visibility fontSize="small" />
-                           </IconButton>
-                            <IconButton
-                              size="small"
-                              color="secondary"
-                              onClick={() => navigate(`/dashboard/caracterizacion-pesca/editar/${item.id}`)}
+                        <Box display="flex" gap={2} alignItems="center">
+                          <Avatar
+                            sx={{
+                              width: 48,
+                              height: 48,
+                              bgcolor: theme.palette.primary.main,
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {item.nombrePescador
+                              ? item.nombrePescador[0].toUpperCase()
+                              : "P"}
+                          </Avatar>
+                          <Box>
+                            <Typography
+                              variant="subtitle1"
+                              fontWeight="bold"
+                              color="text.primary"
                             >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="info"
-                              onClick={() => handleDownloadPdf(item)}
+                              {item.nombrePescador || `Ficha #${item.id}`}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
                             >
-                              <PictureAsPdf fontSize="small" />
-                            </IconButton>
+                              Doc: {item.documento || "N/A"} |{" "}
+                              {item.comunidad || "S/C"}
+                            </Typography>
                           </Box>
+                        </Box>
+                        <Box display="flex" gap={1}>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() =>
+                              navigate(
+                                `/dashboard/caracterizacion-pesca/ver/${item.id}`,
+                              )
+                            }
+                          >
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="secondary"
+                            onClick={() =>
+                              navigate(
+                                `/dashboard/caracterizacion-pesca/editar/${item.id}`,
+                              )
+                            }
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => handleDownloadPdf(item)}
+                          >
+                            <PictureAsPdf fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </Box>
- 
+
                       <Box
                         display="flex"
                         justifyContent="space-between"
@@ -336,17 +402,25 @@ export default function CaracterizacionPescaPage() {
                         borderTop="1px solid"
                         borderColor="grey.100"
                       >
-                        <Chip 
-                          label={`📅 ${item.createdAt || item.fecha 
-                            ? new Date(item.createdAt || item.fecha).toLocaleDateString() 
-                            : 'Sin fecha'}`} 
-                          size="small" 
-                          variant="outlined" 
+                        <Chip
+                          label={`📅 ${
+                            item.createdAt || item.fecha
+                              ? new Date(
+                                  item.createdAt || item.fecha,
+                                ).toLocaleDateString()
+                              : "Sin fecha"
+                          }`}
+                          size="small"
+                          variant="outlined"
                           color="primary"
                         />
                         <Button
                           size="small"
-                          onClick={() => navigate(`/dashboard/caracterizacion-pesca/ver/${item.id}`)}
+                          onClick={() =>
+                            navigate(
+                              `/dashboard/caracterizacion-pesca/ver/${item.id}`,
+                            )
+                          }
                           sx={{ textTransform: "none", fontWeight: 600 }}
                         >
                           Ver Detalles
