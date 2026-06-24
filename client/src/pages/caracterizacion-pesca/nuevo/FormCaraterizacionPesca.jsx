@@ -10,6 +10,9 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Checkbox,
+  FormGroup,
+  MenuItem,
   InputAdornment,
   Paper,
   Divider,
@@ -17,13 +20,19 @@ import {
   CircularProgress,
   IconButton,
 } from "@mui/material";
-import { Delete as DeleteIcon, AddPhotoAlternate as AddPhotoIcon } from "@mui/icons-material";
+import {
+  Delete as DeleteIcon,
+  AddPhotoAlternate as AddPhotoIcon,
+  Add as AddIcon,
+  MyLocation as GpsIcon,
+} from "@mui/icons-material";
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import SignatureDialog from "../../../components/diagnosticos/SignatureDialog";
 import { useNavigate } from "react-router-dom";
 import { useCaracterizacionPesca } from "../../../hooks/useCaracterizacionPesca";
 import { uploadService } from "../../../services/uploadService";
+import { authService } from "../../../services/authService";
 
 export default function FormCaraterizacionPescaPage() {
   const navigate = useNavigate();
@@ -83,6 +92,73 @@ export default function FormCaraterizacionPescaPage() {
         necesidadesPrioritarias: [],
         firmaTitular: "",
         firmaProfesional: "",
+
+      // MÓDULO 0 - CONTROL DEL REGISTRO
+      codigoEncuesta: "",
+      fechaRegistro: "",
+      horaRegistro: "",
+      encuestador: "",
+      gpsLat: "",
+      gpsLng: "",
+
+      // MÓDULO 1 - IDENTIFICACIÓN (complementos)
+      sexo: "",
+      fechaNacimiento: "",
+
+      // MÓDULO 2 - COMPOSICIÓN DEL HOGAR (complemento)
+      personasDiscapacidad: 0,
+
+      // MÓDULO 3 - INTEGRANTES DEL HOGAR (repetible)
+      integrantesHogar: [],
+
+      // MÓDULO 4 - CONDICIONES SOCIOECONÓMICAS
+      ingresoMensual: "",
+      sisben: "",
+      victimaConflicto: "",
+      actividadEconomica: "",
+
+      // MÓDULO 5 - VIVIENDA
+      tipoVivienda: "",
+      materialesVivienda: "",
+      serviciosVivienda: [],
+
+      // MÓDULOS 6 y 7 - UBICACIÓN/PREDIO + TENENCIA (un solo predio)
+      predioGpsLat: "",
+      predioGpsLng: "",
+      predioArea: "",
+      predioAltitud: "",
+      predioAcceso: "",
+      predioPosesion: "",
+      predioUsoTradicional: "",
+      predioHerencia: "",
+
+      // MÓDULO 8 - SISTEMAS PRODUCTIVOS
+      sistemasProductivos: [],
+
+      // MÓDULO 9 - CULTIVOS (repetible)
+      cultivos: [],
+
+      // MÓDULO 10 - PESCA (complemento)
+      artesPesca: [],
+
+      // MÓDULO 11 - COMERCIALIZACIÓN (complementos)
+      compradores: "",
+      precioPromedio: "",
+      canalComercial: "",
+
+      // MÓDULO 12 - AMBIENTE Y RIESGO
+      riesgoInundacion: "",
+      riesgoErosion: "",
+      tieneManglar: "",
+      tieneBosque: "",
+
+      // MÓDULO 13 - PARTICIPACIÓN Y GOBERNANZA
+      participaAsamblea: "",
+      participaComite: "",
+      perteneceAsociacion: "",
+
+      // MÓDULO 15 - NECESIDADES DE INVERSIÓN
+      necesidadesInversion: [],
       },
   });
 
@@ -92,11 +168,48 @@ export default function FormCaraterizacionPescaPage() {
   const adultos = watch("adultos");
   const adultosMayores = watch("adultosMayores");
 
+  // Módulos repetibles (Integrantes del hogar, Cultivos)
+  const integrantes = useFieldArray({ control, name: "integrantesHogar" });
+  const cultivos = useFieldArray({ control, name: "cultivos" });
+
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState(null);
+
   useEffect(() => {
     const total =
       (ninios || 0) + (jovenes || 0) + (adultos || 0) + (adultosMayores || 0);
     setValue("totalPersonas", total);
   }, [ninios, jovenes, adultos, adultosMayores, setValue]);
+
+  // Módulo 0: control del registro — fecha/hora/encuestador automáticos.
+  useEffect(() => {
+    const now = new Date();
+    setValue("fechaRegistro", now.toISOString().slice(0, 10));
+    setValue("horaRegistro", now.toTimeString().slice(0, 5));
+    setValue("encuestador", authService.getUser()?.email || "");
+  }, [setValue]);
+
+  // Captura de coordenadas GPS (funciona sin internet).
+  const capturarGps = (latField, lngField) => {
+    if (!navigator.geolocation) {
+      setGpsError("Este dispositivo no soporta geolocalización.");
+      return;
+    }
+    setGpsError(null);
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setValue(latField, pos.coords.latitude.toFixed(6));
+        setValue(lngField, pos.coords.longitude.toFixed(6));
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsError(err.message || "No se pudo obtener la ubicación.");
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
@@ -198,7 +311,7 @@ export default function FormCaraterizacionPescaPage() {
           <ArrowBack />
         </Button>
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Formulario para Crear Ficha de Caracterización de Pesca
+          Ficha Integral de Caracterización
         </Typography>
       </Box>
 
@@ -218,10 +331,103 @@ export default function FormCaraterizacionPescaPage() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Paper elevation={3} sx={{ p: { xs: 2, md: 3 } }}>
-          {/* SECCIÓN 1: IDENTIFICACIÓN */}
+          {/* MÓDULO 0: CONTROL DEL REGISTRO */}
           <Typography
             variant="h6"
             sx={{ fontWeight: 600, mb: 2, color: "#2E7D32" }}
+          >
+            0. CONTROL DEL REGISTRO
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6} lg={3}>
+              <Controller
+                name="codigoEncuesta"
+                control={control}
+                rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Código de encuesta"
+                    fullWidth
+                    error={!!errors.codigoEncuesta}
+                    helperText={errors.codigoEncuesta?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={6} md={3} lg={3}>
+              <Controller
+                name="fechaRegistro"
+                control={control}
+                render={({ field }) => (
+                  <TextField {...field} label="Fecha" type="date" fullWidth disabled InputLabelProps={{ shrink: true }} />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={6} md={3} lg={2}>
+              <Controller
+                name="horaRegistro"
+                control={control}
+                render={({ field }) => (
+                  <TextField {...field} label="Hora" fullWidth disabled />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={12} lg={4}>
+              <Controller
+                name="encuestador"
+                control={control}
+                render={({ field }) => (
+                  <TextField {...field} label="Encuestador" fullWidth disabled helperText="Se registra automáticamente al iniciar sesión" />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={6} md={4}>
+              <Controller
+                name="gpsLat"
+                control={control}
+                render={({ field }) => (
+                  <TextField {...field} label="GPS - Latitud" fullWidth InputProps={{ readOnly: true }} />
+                )}
+              />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <Controller
+                name="gpsLng"
+                control={control}
+                render={({ field }) => (
+                  <TextField {...field} label="GPS - Longitud" fullWidth InputProps={{ readOnly: true }} />
+                )}
+              />
+            </Grid>
+            <Grid item xs={12} md={4} sx={{ display: "flex", alignItems: "center" }}>
+              <Button
+                variant="outlined"
+                startIcon={gpsLoading ? <CircularProgress size={18} /> : <GpsIcon />}
+                onClick={() => capturarGps("gpsLat", "gpsLng")}
+                disabled={gpsLoading}
+                fullWidth
+              >
+                {gpsLoading ? "Capturando..." : "Capturar GPS"}
+              </Button>
+            </Grid>
+            {gpsError && (
+              <Grid item xs={12}>
+                <Alert severity="warning">{gpsError}</Alert>
+              </Grid>
+            )}
+          </Grid>
+
+          {/* SECCIÓN 1: IDENTIFICACIÓN */}
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}
           >
             1. IDENTIFICACIÓN
           </Typography>
@@ -302,6 +508,47 @@ export default function FormCaraterizacionPescaPage() {
                     label="Teléfono (WhatsApp)"
                     fullWidth
                     placeholder="Ej: 3012345678"
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6} lg={4}>
+              <Controller
+                name="sexo"
+                control={control}
+                rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Sexo"
+                    fullWidth
+                    error={!!errors.sexo}
+                    helperText={errors.sexo?.message}
+                  >
+                    <MenuItem value="M">Masculino</MenuItem>
+                    <MenuItem value="F">Femenino</MenuItem>
+                    <MenuItem value="otro">Otro</MenuItem>
+                  </TextField>
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6} lg={4}>
+              <Controller
+                name="fechaNacimiento"
+                control={control}
+                rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Fecha de nacimiento"
+                    type="date"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    error={!!errors.fechaNacimiento}
+                    helperText={errors.fechaNacimiento?.message}
                   />
                 )}
               />
@@ -434,6 +681,23 @@ export default function FormCaraterizacionPescaPage() {
                     label="Mujeres"
                     type="number"
                     fullWidth
+                    InputProps={{ inputProps: { min: 0 } }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <Controller
+                name="personasDiscapacidad"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Personas con discapacidad"
+                    type="number"
+                    fullWidth
+                    onChange={(e) => field.onChange(Number(e.target.value))}
                     InputProps={{ inputProps: { min: 0 } }}
                   />
                 )}
@@ -723,6 +987,48 @@ export default function FormCaraterizacionPescaPage() {
                   )}
                 />
               </FormControl>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormLabel component="legend" sx={{ mb: 1 }}>
+                Artes de pesca utilizadas:
+              </FormLabel>
+              <Controller
+                name="artesPesca"
+                control={control}
+                render={({ field }) => (
+                  <FormGroup row>
+                    {[
+                      { value: "red", label: "Red" },
+                      { value: "anzuelo", label: "Anzuelo / Línea" },
+                      { value: "trasmallo", label: "Trasmallo" },
+                      { value: "atarraya", label: "Atarraya" },
+                      { value: "nasa", label: "Nasa / Trampa" },
+                      { value: "otro", label: "Otro" },
+                    ].map((item) => (
+                      <FormControlLabel
+                        key={item.value}
+                        control={
+                          <Checkbox
+                            checked={field.value?.includes(item.value) || false}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              field.onChange(
+                                e.target.checked
+                                  ? [...current, item.value]
+                                  : current.filter((v) => v !== item.value)
+                              );
+                            }}
+                          />
+                        }
+                        label={item.label}
+                      />
+                    ))}
+                  </FormGroup>
+                )}
+              />
             </Grid>
           </Grid>
 
@@ -1247,12 +1553,472 @@ export default function FormCaraterizacionPescaPage() {
             </Grid>
           </Grid>
 
-          {/* SECCIÓN 9: ANEXOS FOTOGRÁFICOS */}
+          {/* SECCIÓN 9: INTEGRANTES DEL HOGAR (repetible) */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            9. INTEGRANTES DEL HOGAR
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="body2" color="textSecondary">
+              Registre cada integrante del hogar.
+            </Typography>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => integrantes.append({ nombre: "", edad: "", parentesco: "", escolaridad: "", ocupacion: "" })}
+            >
+              Agregar integrante
+            </Button>
+          </Box>
+          <Grid container spacing={3}>
+            {integrantes.fields.map((item, index) => (
+              <Grid item xs={12} key={item.id}>
+                <Paper variant="outlined" sx={{ p: 2, position: "relative", bgcolor: "#f9f9f9" }}>
+                  <IconButton onClick={() => integrantes.remove(index)} sx={{ position: "absolute", top: 5, right: 5, color: "error.main" }} size="small">
+                    <DeleteIcon />
+                  </IconButton>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <Controller name={`integrantesHogar.${index}.nombre`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (
+                          <TextField {...field} label="Nombre" fullWidth size="small" error={!!fieldState.error} helperText={fieldState.error?.message} />
+                        )} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`integrantesHogar.${index}.edad`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (
+                          <TextField {...field} label="Edad" type="number" fullWidth size="small" InputProps={{ inputProps: { min: 0 } }} error={!!fieldState.error} helperText={fieldState.error?.message} />
+                        )} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`integrantesHogar.${index}.parentesco`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (
+                          <TextField {...field} label="Parentesco" fullWidth size="small" error={!!fieldState.error} helperText={fieldState.error?.message} />
+                        )} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`integrantesHogar.${index}.escolaridad`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (
+                          <TextField {...field} select label="Escolaridad" fullWidth size="small" error={!!fieldState.error} helperText={fieldState.error?.message}>
+                            <MenuItem value="ninguna">Ninguna</MenuItem>
+                            <MenuItem value="primaria">Primaria</MenuItem>
+                            <MenuItem value="secundaria">Secundaria</MenuItem>
+                            <MenuItem value="tecnica">Técnica</MenuItem>
+                            <MenuItem value="universitaria">Universitaria</MenuItem>
+                          </TextField>
+                        )} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`integrantesHogar.${index}.ocupacion`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (
+                          <TextField {...field} label="Ocupación" fullWidth size="small" error={!!fieldState.error} helperText={fieldState.error?.message} />
+                        )} />
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* SECCIÓN 10: CONDICIONES SOCIOECONÓMICAS */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            10. CONDICIONES SOCIOECONÓMICAS
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6} lg={3}>
+              <Controller name="ingresoMensual" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField {...field} select label="Ingreso mensual del hogar" fullWidth error={!!errors.ingresoMensual} helperText={errors.ingresoMensual?.message}>
+                    <MenuItem value="menos-1-salario">Menos de 1 salario mínimo</MenuItem>
+                    <MenuItem value="1-salario">≈ 1 salario mínimo</MenuItem>
+                    <MenuItem value="mas-1-salario">Más de 1 salario mínimo</MenuItem>
+                    <MenuItem value="sin-ingreso-fijo">Sin ingreso fijo</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <Controller name="sisben" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField {...field} select label="Grupo SISBÉN" fullWidth error={!!errors.sisben} helperText={errors.sisben?.message}>
+                    <MenuItem value="A">A</MenuItem>
+                    <MenuItem value="B">B</MenuItem>
+                    <MenuItem value="C">C</MenuItem>
+                    <MenuItem value="D">D</MenuItem>
+                    <MenuItem value="no-tiene">No tiene</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <FormControl component="fieldset">
+                <FormLabel component="legend">¿Víctima del conflicto?</FormLabel>
+                <Controller name="victimaConflicto" control={control} rules={{ required: "Seleccione una opción" }}
+                  render={({ field }) => (
+                    <RadioGroup {...field} row>
+                      <FormControlLabel value="si" control={<Radio />} label="Sí" />
+                      <FormControlLabel value="no" control={<Radio />} label="No" />
+                    </RadioGroup>
+                  )} />
+              </FormControl>
+              {errors.victimaConflicto && (
+                <Typography color="error" variant="caption" display="block">{errors.victimaConflicto.message}</Typography>
+              )}
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <Controller name="actividadEconomica" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField {...field} label="Actividad económica principal" fullWidth error={!!errors.actividadEconomica} helperText={errors.actividadEconomica?.message} />
+                )} />
+            </Grid>
+          </Grid>
+
+          {/* SECCIÓN 11: VIVIENDA */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            11. VIVIENDA
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <Controller name="tipoVivienda" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField {...field} select label="Tipo de vivienda" fullWidth error={!!errors.tipoVivienda} helperText={errors.tipoVivienda?.message}>
+                    <MenuItem value="propia">Propia</MenuItem>
+                    <MenuItem value="arrendada">Arrendada</MenuItem>
+                    <MenuItem value="familiar">Familiar</MenuItem>
+                    <MenuItem value="invasion">Posesión / Invasión</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Controller name="materialesVivienda" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField {...field} select label="Material predominante" fullWidth error={!!errors.materialesVivienda} helperText={errors.materialesVivienda?.message}>
+                    <MenuItem value="madera">Madera</MenuItem>
+                    <MenuItem value="cemento">Cemento / Bloque</MenuItem>
+                    <MenuItem value="mixta">Mixta</MenuItem>
+                    <MenuItem value="otro">Otro</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+            <Grid item xs={12}>
+              <FormLabel component="legend" sx={{ mb: 1 }}>Servicios disponibles:</FormLabel>
+              <Controller name="serviciosVivienda" control={control}
+                render={({ field }) => (
+                  <FormGroup row>
+                    {[
+                      { value: "energia", label: "Energía" },
+                      { value: "acueducto", label: "Acueducto" },
+                      { value: "alcantarillado", label: "Alcantarillado" },
+                      { value: "gas", label: "Gas" },
+                      { value: "internet", label: "Internet" },
+                      { value: "ninguno", label: "Ninguno" },
+                    ].map((item) => (
+                      <FormControlLabel key={item.value}
+                        control={
+                          <Checkbox checked={field.value?.includes(item.value) || false}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              field.onChange(e.target.checked ? [...current, item.value] : current.filter((v) => v !== item.value));
+                            }} />
+                        }
+                        label={item.label} />
+                    ))}
+                  </FormGroup>
+                )} />
+            </Grid>
+          </Grid>
+
+          {/* SECCIÓN 12: UBICACIÓN, PREDIO Y TENENCIA */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            12. UBICACIÓN, PREDIO Y TENENCIA
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Grid container spacing={3}>
+            <Grid item xs={6} md={3}>
+              <Controller name="predioGpsLat" control={control}
+                render={({ field }) => (<TextField {...field} label="Latitud" fullWidth size="small" InputProps={{ readOnly: true }} />)} />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Controller name="predioGpsLng" control={control}
+                render={({ field }) => (<TextField {...field} label="Longitud" fullWidth size="small" InputProps={{ readOnly: true }} />)} />
+            </Grid>
+            <Grid item xs={12} md={3} sx={{ display: "flex", alignItems: "center" }}>
+              <Button variant="outlined" size="small" startIcon={<GpsIcon />} fullWidth
+                onClick={() => capturarGps("predioGpsLat", "predioGpsLng")}>
+                Capturar GPS
+              </Button>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Controller name="predioArea" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (<TextField {...field} label="Área (ha)" type="number" fullWidth size="small" error={!!errors.predioArea} helperText={errors.predioArea?.message} />)} />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Controller name="predioAltitud" control={control}
+                render={({ field }) => (<TextField {...field} label="Altitud (msnm)" type="number" fullWidth size="small" />)} />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Controller name="predioAcceso" control={control}
+                render={({ field }) => (
+                  <TextField {...field} select label="Acceso" fullWidth size="small">
+                    <MenuItem value="terrestre">Terrestre</MenuItem>
+                    <MenuItem value="fluvial">Fluvial</MenuItem>
+                    <MenuItem value="maritimo">Marítimo</MenuItem>
+                    <MenuItem value="mixto">Mixto</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Controller name="predioPosesion" control={control}
+                render={({ field }) => (
+                  <TextField {...field} select label="Posesión" fullWidth size="small">
+                    <MenuItem value="propietario">Propietario</MenuItem>
+                    <MenuItem value="poseedor">Poseedor</MenuItem>
+                    <MenuItem value="ocupante">Ocupante</MenuItem>
+                    <MenuItem value="colectivo">Territorio colectivo</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <FormControl component="fieldset">
+                <FormLabel component="legend">Uso tradicional</FormLabel>
+                <Controller name="predioUsoTradicional" control={control}
+                  render={({ field }) => (
+                    <RadioGroup {...field} row>
+                      <FormControlLabel value="si" control={<Radio size="small" />} label="Sí" />
+                      <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                    </RadioGroup>
+                  )} />
+              </FormControl>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <FormControl component="fieldset">
+                <FormLabel component="legend">¿Por herencia?</FormLabel>
+                <Controller name="predioHerencia" control={control}
+                  render={({ field }) => (
+                    <RadioGroup {...field} row>
+                      <FormControlLabel value="si" control={<Radio size="small" />} label="Sí" />
+                      <FormControlLabel value="no" control={<Radio size="small" />} label="No" />
+                    </RadioGroup>
+                  )} />
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          {/* SECCIÓN 13: SISTEMAS PRODUCTIVOS */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            13. SISTEMAS PRODUCTIVOS
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Controller name="sistemasProductivos" control={control} rules={{ validate: (v) => (v && v.length > 0) || "Seleccione al menos uno" }}
+            render={({ field, fieldState }) => (
+              <>
+                <FormGroup row>
+                  {[
+                    { value: "coco", label: "Coco" },
+                    { value: "cacao", label: "Cacao" },
+                    { value: "platano", label: "Plátano" },
+                    { value: "pesca", label: "Pesca" },
+                    { value: "piscicultura", label: "Piscicultura" },
+                    { value: "otro", label: "Otro" },
+                  ].map((item) => (
+                    <FormControlLabel key={item.value}
+                      control={
+                        <Checkbox checked={field.value?.includes(item.value) || false}
+                          onChange={(e) => {
+                            const current = field.value || [];
+                            field.onChange(e.target.checked ? [...current, item.value] : current.filter((v) => v !== item.value));
+                          }} />
+                      }
+                      label={item.label} />
+                  ))}
+                </FormGroup>
+                {fieldState.error && (
+                  <Typography color="error" variant="caption" display="block">{fieldState.error.message}</Typography>
+                )}
+              </>
+            )} />
+
+          {/* SECCIÓN 14: CULTIVOS (repetible) */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            14. CULTIVOS
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="body2" color="textSecondary">
+              Registre un cultivo por fila (si aplica).
+            </Typography>
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => cultivos.append({ nombreCultivo: "", area: "", produccion: "", rendimiento: "", ingresos: "" })}
+            >
+              Agregar cultivo
+            </Button>
+          </Box>
+          <Grid container spacing={3}>
+            {cultivos.fields.map((item, index) => (
+              <Grid item xs={12} key={item.id}>
+                <Paper variant="outlined" sx={{ p: 2, position: "relative", bgcolor: "#f9f9f9" }}>
+                  <IconButton onClick={() => cultivos.remove(index)} sx={{ position: "absolute", top: 5, right: 5, color: "error.main" }} size="small">
+                    <DeleteIcon />
+                  </IconButton>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <Controller name={`cultivos.${index}.nombreCultivo`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (<TextField {...field} label="Cultivo" fullWidth size="small" error={!!fieldState.error} helperText={fieldState.error?.message} />)} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`cultivos.${index}.area`} control={control} rules={{ required: "Requerido" }}
+                        render={({ field, fieldState }) => (<TextField {...field} label="Área (ha)" type="number" fullWidth size="small" error={!!fieldState.error} helperText={fieldState.error?.message} />)} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`cultivos.${index}.produccion`} control={control}
+                        render={({ field }) => (<TextField {...field} label="Producción" fullWidth size="small" />)} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`cultivos.${index}.rendimiento`} control={control}
+                        render={({ field }) => (<TextField {...field} label="Rendimiento" fullWidth size="small" />)} />
+                    </Grid>
+                    <Grid item xs={6} md={2}>
+                      <Controller name={`cultivos.${index}.ingresos`} control={control}
+                        render={({ field }) => (<TextField {...field} label="Ingresos ($)" type="number" fullWidth size="small" />)} />
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* SECCIÓN 15: COMERCIALIZACIÓN GENERAL */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            15. COMERCIALIZACIÓN GENERAL
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <Controller name="compradores" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (<TextField {...field} label="Principales compradores" fullWidth error={!!errors.compradores} helperText={errors.compradores?.message} />)} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Controller name="precioPromedio" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (<TextField {...field} label="Precio promedio de venta ($)" type="number" fullWidth error={!!errors.precioPromedio} helperText={errors.precioPromedio?.message} />)} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Controller name="canalComercial" control={control} rules={{ required: "Este campo es requerido" }}
+                render={({ field }) => (
+                  <TextField {...field} select label="Canal comercial" fullWidth error={!!errors.canalComercial} helperText={errors.canalComercial?.message}>
+                    <MenuItem value="directo">Venta directa</MenuItem>
+                    <MenuItem value="intermediario">Intermediario</MenuItem>
+                    <MenuItem value="asociacion">Asociación</MenuItem>
+                    <MenuItem value="mercado">Mercado / Plaza</MenuItem>
+                  </TextField>
+                )} />
+            </Grid>
+          </Grid>
+
+          {/* SECCIÓN 16: AMBIENTE Y RIESGO */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            16. AMBIENTE Y RIESGO
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Grid container spacing={3}>
+            {[
+              { name: "riesgoInundacion", label: "¿Riesgo de inundación?" },
+              { name: "riesgoErosion", label: "¿Riesgo de erosión?" },
+              { name: "tieneManglar", label: "¿Hay manglar?" },
+              { name: "tieneBosque", label: "¿Hay bosque?" },
+            ].map((item) => (
+              <Grid item xs={12} md={3} key={item.name}>
+                <FormControl component="fieldset">
+                  <FormLabel component="legend">{item.label}</FormLabel>
+                  <Controller name={item.name} control={control} rules={{ required: "Seleccione una opción" }}
+                    render={({ field }) => (
+                      <RadioGroup {...field} row>
+                        <FormControlLabel value="si" control={<Radio />} label="Sí" />
+                        <FormControlLabel value="no" control={<Radio />} label="No" />
+                      </RadioGroup>
+                    )} />
+                </FormControl>
+                {errors[item.name] && (
+                  <Typography color="error" variant="caption" display="block">{errors[item.name].message}</Typography>
+                )}
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* SECCIÓN 17: PARTICIPACIÓN Y GOBERNANZA */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            17. PARTICIPACIÓN Y GOBERNANZA
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Grid container spacing={3}>
+            {[
+              { name: "participaAsamblea", label: "¿Participa en asambleas?" },
+              { name: "participaComite", label: "¿Participa en comités?" },
+              { name: "perteneceAsociacion", label: "¿Pertenece a una asociación?" },
+            ].map((item) => (
+              <Grid item xs={12} md={4} key={item.name}>
+                <FormControl component="fieldset">
+                  <FormLabel component="legend">{item.label}</FormLabel>
+                  <Controller name={item.name} control={control} rules={{ required: "Seleccione una opción" }}
+                    render={({ field }) => (
+                      <RadioGroup {...field} row>
+                        <FormControlLabel value="si" control={<Radio />} label="Sí" />
+                        <FormControlLabel value="no" control={<Radio />} label="No" />
+                      </RadioGroup>
+                    )} />
+                </FormControl>
+                {errors[item.name] && (
+                  <Typography color="error" variant="caption" display="block">{errors[item.name].message}</Typography>
+                )}
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* SECCIÓN 18: NECESIDADES DE INVERSIÓN */}
+          <Typography variant="h6" sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}>
+            18. NECESIDADES DE INVERSIÓN
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Controller name="necesidadesInversion" control={control} rules={{ validate: (v) => (v && v.length > 0) || "Seleccione al menos una" }}
+            render={({ field, fieldState }) => (
+              <>
+                <FormGroup row>
+                  {[
+                    { value: "coco", label: "Coco" },
+                    { value: "vivienda", label: "Vivienda" },
+                    { value: "energia", label: "Energía" },
+                    { value: "agua", label: "Agua" },
+                    { value: "fortalecimiento", label: "Fortalecimiento organizativo" },
+                    { value: "otro", label: "Otro" },
+                  ].map((item) => (
+                    <FormControlLabel key={item.value}
+                      control={
+                        <Checkbox checked={field.value?.includes(item.value) || false}
+                          onChange={(e) => {
+                            const current = field.value || [];
+                            field.onChange(e.target.checked ? [...current, item.value] : current.filter((v) => v !== item.value));
+                          }} />
+                      }
+                      label={item.label} />
+                  ))}
+                </FormGroup>
+                {fieldState.error && (
+                  <Typography color="error" variant="caption" display="block">{fieldState.error.message}</Typography>
+                )}
+              </>
+            )} />
+
+          {/* SECCIÓN 19: ANEXOS FOTOGRÁFICOS */}
           <Typography
             variant="h6"
             sx={{ fontWeight: 600, mt: 4, mb: 2, color: "#2E7D32" }}
           >
-            9. ANEXOS FOTOGRÁFICOS
+            19. ANEXOS FOTOGRÁFICOS
           </Typography>
           <Divider sx={{ mb: 3 }} />
 
