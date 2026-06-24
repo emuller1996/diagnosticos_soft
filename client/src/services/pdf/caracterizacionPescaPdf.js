@@ -46,15 +46,38 @@ const hydrateAssets = async (data) => {
 export const generateCaracterizacionPescaPdf = (data) => {
   const doc = new PdfDocument();
 
+  // Helpers de mapeo comunes
+  const siNoMapG = { 'si': 'SÍ', 'no': 'NO' };
+  const multiToStr = (arr, list) =>
+    (Array.isArray(arr) && arr.length)
+      ? arr.map((v) => list[v] || v).join(', ')
+      : "N/A";
+
   // 1. ENCABEZADO
-  doc.title("FICHA DE CARACTERIZACIÓN DE PESCA");
-  doc.subtitle("Documento de registro técnico de caracterización pesquera");
-  
+  doc.title("FICHA INTEGRAL DE CARACTERIZACIÓN");
+  doc.subtitle("Documento de registro técnico de caracterización territorial, socioeconómica, productiva y ambiental");
+
+  doc.spacer(10);
+
+  // MÓDULO 0: CONTROL DEL REGISTRO
+  doc.sectionHeader("0. CONTROL DEL REGISTRO");
+  doc.fieldRow([
+    { label: "Código de encuesta:", value: data.codigoEncuesta || "N/A" },
+    { label: "Fecha:", value: data.fechaRegistro || "N/A" },
+    { label: "Hora:", value: data.horaRegistro || "N/A" },
+  ]);
+  doc.fieldRow([
+    { label: "Encuestador:", value: data.encuestador || data.registradoPor || "N/A" },
+    { label: "GPS (Lat, Lng):", value: (data.gpsLat || data.gpsLng) ? `${data.gpsLat || "?"}, ${data.gpsLng || "?"}` : "N/A" },
+  ]);
+
   doc.spacer(10);
 
   // SECCIÓN 1: IDENTIFICACIÓN
   doc.sectionHeader("1. IDENTIFICACIÓN");
-  
+
+  const sexoMap = { 'M': 'Masculino', 'F': 'Femenino', 'otro': 'Otro' };
+
   doc.fieldRow([
     { label: "Nombre del Pescador:", value: data.nombrePescador },
     { label: "Documento:", value: data.documento },
@@ -66,6 +89,10 @@ export const generateCaracterizacionPescaPdf = (data) => {
   doc.fieldRow([
     { label: "Comunidad / Vereda:", value: data.comunidad },
     { label: "Teléfono:", value: data.telefono },
+  ]);
+  doc.fieldRow([
+    { label: "Sexo:", value: sexoMap[data.sexo] || data.sexo || "N/A" },
+    { label: "Fecha de nacimiento:", value: data.fechaNacimiento || "N/A" },
   ]);
 
   doc.spacer(10);
@@ -84,6 +111,7 @@ export const generateCaracterizacionPescaPdf = (data) => {
     ["Adultos Mayores (60+)", data.adultosMayores || 0],
     ["Hombres", data.hombres || 0],
     ["Mujeres", data.mujeres || 0],
+    ["Personas con discapacidad", data.personasDiscapacidad || 0],
   ];
   
   doc.table(columns, rows);
@@ -142,6 +170,11 @@ export const generateCaracterizacionPescaPdf = (data) => {
         { label: "Estado Motor:", value: estadoMap[data.estadoMotor] || data.estadoMotor || "N/A" },
       ]);
     }
+
+    const artesMap = { 'red': 'Red', 'anzuelo': 'Anzuelo / Línea', 'trasmallo': 'Trasmallo', 'atarraya': 'Atarraya', 'nasa': 'Nasa / Trampa', 'otro': 'Otro' };
+    doc.fieldRow([
+      { label: "Artes de pesca:", value: multiToStr(data.artesPesca, artesMap) },
+    ]);
 
     doc.spacer(10);
 
@@ -238,10 +271,164 @@ export const generateCaracterizacionPescaPdf = (data) => {
 
     doc.spacer(10);
 
-    // SECCIÓN 9: ANEXOS FOTOGRÁFICOS
+    // SECCIÓN 9: INTEGRANTES DEL HOGAR
+    doc.sectionHeader("9. INTEGRANTES DEL HOGAR");
+    const integrantes = Array.isArray(data.integrantesHogar) ? data.integrantesHogar : [];
+    if (integrantes.length > 0) {
+      const escMap = { 'ninguna': 'Ninguna', 'primaria': 'Primaria', 'secundaria': 'Secundaria', 'tecnica': 'Técnica', 'universitaria': 'Universitaria' };
+      doc.table(
+        ["Nombre", "Edad", "Parentesco", "Escolaridad", "Ocupación"],
+        integrantes.map((it) => [
+          it.nombre || "", it.edad || "", it.parentesco || "",
+          escMap[it.escolaridad] || it.escolaridad || "", it.ocupacion || "",
+        ])
+      );
+    } else {
+      doc.subtitle("Sin integrantes registrados.", { size: 9, color: [0, 0, 0] });
+    }
+
+    doc.spacer(10);
+
+    // SECCIÓN 10: CONDICIONES SOCIOECONÓMICAS
+    doc.sectionHeader("10. CONDICIONES SOCIOECONÓMICAS");
+    const ingresoMap = { 'menos-1-salario': 'Menos de 1 salario mínimo', '1-salario': '≈ 1 salario mínimo', 'mas-1-salario': 'Más de 1 salario mínimo', 'sin-ingreso-fijo': 'Sin ingreso fijo' };
+    const sisbenMap = { 'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', 'no-tiene': 'No tiene' };
+    doc.fieldRow([
+      { label: "Ingreso mensual:", value: ingresoMap[data.ingresoMensual] || data.ingresoMensual || "N/A" },
+      { label: "Grupo SISBÉN:", value: sisbenMap[data.sisben] || data.sisben || "N/A" },
+    ]);
+    doc.fieldRow([
+      { label: "¿Víctima del conflicto?:", value: siNoMapG[data.victimaConflicto] || data.victimaConflicto || "N/A" },
+      { label: "Actividad económica:", value: data.actividadEconomica || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 11: VIVIENDA
+    doc.sectionHeader("11. VIVIENDA");
+    const tipoViviendaMap = { 'propia': 'Propia', 'arrendada': 'Arrendada', 'familiar': 'Familiar', 'invasion': 'Posesión / Invasión' };
+    const materialViviendaMap = { 'madera': 'Madera', 'cemento': 'Cemento / Bloque', 'mixta': 'Mixta', 'otro': 'Otro' };
+    const serviciosMap = { 'energia': 'Energía', 'acueducto': 'Acueducto', 'alcantarillado': 'Alcantarillado', 'gas': 'Gas', 'internet': 'Internet', 'ninguno': 'Ninguno' };
+    doc.fieldRow([
+      { label: "Tipo de vivienda:", value: tipoViviendaMap[data.tipoVivienda] || data.tipoVivienda || "N/A" },
+      { label: "Material predominante:", value: materialViviendaMap[data.materialesVivienda] || data.materialesVivienda || "N/A" },
+    ]);
+    doc.fieldRow([
+      { label: "Servicios disponibles:", value: multiToStr(data.serviciosVivienda, serviciosMap) },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 12: UBICACIÓN, PREDIO Y TENENCIA
+    doc.sectionHeader("12. UBICACIÓN, PREDIO Y TENENCIA");
+    const accesoMap = { 'terrestre': 'Terrestre', 'fluvial': 'Fluvial', 'maritimo': 'Marítimo', 'mixto': 'Mixto' };
+    const posesionMap = { 'propietario': 'Propietario', 'poseedor': 'Poseedor', 'ocupante': 'Ocupante', 'colectivo': 'Territorio colectivo' };
+    doc.fieldRow([
+      { label: "GPS (Lat, Lng):", value: (data.predioGpsLat || data.predioGpsLng) ? `${data.predioGpsLat || "?"}, ${data.predioGpsLng || "?"}` : "N/A" },
+      { label: "Área (ha):", value: data.predioArea || "N/A" },
+      { label: "Altitud (msnm):", value: data.predioAltitud || "N/A" },
+    ]);
+    doc.fieldRow([
+      { label: "Acceso:", value: accesoMap[data.predioAcceso] || data.predioAcceso || "N/A" },
+      { label: "Posesión:", value: posesionMap[data.predioPosesion] || data.predioPosesion || "N/A" },
+    ]);
+    doc.fieldRow([
+      { label: "Uso tradicional:", value: siNoMapG[data.predioUsoTradicional] || data.predioUsoTradicional || "N/A" },
+      { label: "¿Por herencia?:", value: siNoMapG[data.predioHerencia] || data.predioHerencia || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 13: SISTEMAS PRODUCTIVOS
+    doc.sectionHeader("13. SISTEMAS PRODUCTIVOS");
+    const sistemasList = [
+      { value: "coco", label: "Coco" },
+      { value: "cacao", label: "Cacao" },
+      { value: "platano", label: "Plátano" },
+      { value: "pesca", label: "Pesca" },
+      { value: "piscicultura", label: "Piscicultura" },
+      { value: "otro", label: "Otro" },
+    ];
+    const selectedSistemas = (data.sistemasProductivos || []);
+    doc.checkboxList(
+      sistemasList.map((s) => ({ label: s.label, checked: selectedSistemas.includes(s.value) })),
+      { title: "Sistemas productivos del hogar:" }
+    );
+
+    doc.spacer(10);
+
+    // SECCIÓN 14: CULTIVOS
+    doc.sectionHeader("14. CULTIVOS");
+    const cultivos = Array.isArray(data.cultivos) ? data.cultivos : [];
+    if (cultivos.length > 0) {
+      doc.table(
+        ["Cultivo", "Área (ha)", "Producción", "Rendimiento", "Ingresos ($)"],
+        cultivos.map((c) => [
+          c.nombreCultivo || "", c.area || "", c.produccion || "", c.rendimiento || "", c.ingresos || "",
+        ])
+      );
+    } else {
+      doc.subtitle("Sin cultivos registrados.", { size: 9, color: [0, 0, 0] });
+    }
+
+    doc.spacer(10);
+
+    // SECCIÓN 15: COMERCIALIZACIÓN GENERAL
+    doc.sectionHeader("15. COMERCIALIZACIÓN GENERAL");
+    const canalMap = { 'directo': 'Venta directa', 'intermediario': 'Intermediario', 'asociacion': 'Asociación', 'mercado': 'Mercado / Plaza' };
+    doc.fieldRow([
+      { label: "Compradores:", value: data.compradores || "N/A" },
+      { label: "Precio promedio ($):", value: data.precioPromedio || "N/A" },
+      { label: "Canal comercial:", value: canalMap[data.canalComercial] || data.canalComercial || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 16: AMBIENTE Y RIESGO
+    doc.sectionHeader("16. AMBIENTE Y RIESGO");
+    doc.fieldRow([
+      { label: "Riesgo de inundación:", value: siNoMapG[data.riesgoInundacion] || data.riesgoInundacion || "N/A" },
+      { label: "Riesgo de erosión:", value: siNoMapG[data.riesgoErosion] || data.riesgoErosion || "N/A" },
+    ]);
+    doc.fieldRow([
+      { label: "¿Hay manglar?:", value: siNoMapG[data.tieneManglar] || data.tieneManglar || "N/A" },
+      { label: "¿Hay bosque?:", value: siNoMapG[data.tieneBosque] || data.tieneBosque || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 17: PARTICIPACIÓN Y GOBERNANZA
+    doc.sectionHeader("17. PARTICIPACIÓN Y GOBERNANZA");
+    doc.fieldRow([
+      { label: "¿Participa en asambleas?:", value: siNoMapG[data.participaAsamblea] || data.participaAsamblea || "N/A" },
+      { label: "¿Participa en comités?:", value: siNoMapG[data.participaComite] || data.participaComite || "N/A" },
+      { label: "¿Pertenece a asociación?:", value: siNoMapG[data.perteneceAsociacion] || data.perteneceAsociacion || "N/A" },
+    ]);
+
+    doc.spacer(10);
+
+    // SECCIÓN 18: NECESIDADES DE INVERSIÓN
+    doc.sectionHeader("18. NECESIDADES DE INVERSIÓN");
+    const inversionList = [
+      { value: "coco", label: "Coco" },
+      { value: "vivienda", label: "Vivienda" },
+      { value: "energia", label: "Energía" },
+      { value: "agua", label: "Agua" },
+      { value: "fortalecimiento", label: "Fortalecimiento organizativo" },
+      { value: "otro", label: "Otro" },
+    ];
+    const selectedInversion = (data.necesidadesInversion || []);
+    doc.checkboxList(
+      inversionList.map((s) => ({ label: s.label, checked: selectedInversion.includes(s.value) })),
+      { title: "Necesidades de inversión identificadas:" }
+    );
+
+    doc.spacer(10);
+
+    // SECCIÓN 19: ANEXOS FOTOGRÁFICOS
     const fotos = data.anexoFotografico?.fotos || [];
     if (fotos.length > 0) {
-      doc.sectionHeader("9. ANEXOS FOTOGRÁFICOS");
+      doc.sectionHeader("19. ANEXOS FOTOGRÁFICOS");
       doc.spacer(5);
 
       const dataUrls = data._anexoFotosDataUrls || [];
